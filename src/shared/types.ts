@@ -10,11 +10,12 @@ export enum IpcChannel {
   GetResults = 'IPC_GET_RESULTS',
   GetSuggestions = 'IPC_GET_SUGGESTIONS',
   ActionMove = 'IPC_ACTION_MOVE',
-  AiSearch = 'IPC_AI_SEARCH'
+  AiSearch = 'IPC_AI_SEARCH',
+  RedactText = 'IPC_REDACT_TEXT'
 }
 
 export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED' | 'CANCELLED'
-export type FileTag = 'DUPLICATE' | 'LARGE' | 'STALE' | 'JUNK' | 'EMPTY_FOLDER' | 'INVOICE' | 'CONTRACT' | 'RECEIPT' | 'FINANCIAL' | 'LEGAL' | 'PERSONAL' | 'SCREENSHOT'
+export type FileTag = 'DUPLICATE' | 'LARGE' | 'STALE' | 'JUNK' | 'EMPTY_FOLDER' | 'INVOICE' | 'CONTRACT' | 'RECEIPT' | 'FINANCIAL' | 'LEGAL' | 'PERSONAL' | 'SCREENSHOT' | 'SENSITIVE'
 
 export interface FileNode {
   id: string // UUID
@@ -119,6 +120,7 @@ export interface FileZenApi {
     payload: ActionPayload & { destination: string }
   ): Promise<{ success: string[]; failures: string[] }>
   aiSearch(query: string): Promise<any[]>
+  redactText(text: string): Promise<string>
 }
 
 // --- AI / Smart Stack Types ---

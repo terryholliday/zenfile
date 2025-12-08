@@ -87,6 +87,11 @@ app.whenReady().then(() => {
       return await import('./ai-service').then(m => m.aiService.search(query))
   })
 
+  ipcMain.handle(IpcChannel.RedactText, async (_, text) => {
+      const { privacyService } = await import('./privacy-service')
+      return privacyService.redact(text)
+  })
+
   createWindow()
 
   app.on('activate', function () {

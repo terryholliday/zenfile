@@ -36,22 +36,21 @@ export class TagEngine {
     }
   ]
 
+import { privacyService } from './privacy-service'
+
+// ... existing code ...
+
   analyze(file: FileNode): FileTag[] {
     const tags: Set<FileTag> = new Set()
-    const content = `${file.name} ${file.metadata?.text || ''}`.toLowerCase()
+    const content = `${file.name} ${file.metadata?.text || ''}`
+    const lowerContent = content.toLowerCase()
 
     for (const rule of this.rules) {
-      if (this.matchesRule(content, rule)) {
+      if (this.matchesRule(lowerContent, rule)) {
         tags.add(rule.tag)
       }
     }
 
-    // Implicit Tags based on extension
-    const ext = path.extname(file.name).toLowerCase()
-    if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
-        // Checking rules above might have already caught "screenshot"
-        // But we could add 'IMAGE' if we had it
-    }
 
     return Array.from(tags)
   }
