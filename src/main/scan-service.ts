@@ -11,7 +11,8 @@ import {
     DuplicateCluster,
     ScanProgressPayload,
     IpcChannel,
-    ActionPayload
+    ActionPayload,
+    AiRecommendation
 } from '../shared/types';
 import {
     WorkerMessageType,
@@ -41,6 +42,7 @@ export class ScanService {
 
     // In-Memory Results
     private resultFiles: Map<string, FileNode> = new Map();
+    private aiRecommendations: AiRecommendation[] = [];
 
     constructor() { }
 
@@ -49,6 +51,13 @@ export class ScanService {
             return this.session;
         }
         return null;
+    }
+
+    getAiRecommendations(sessionId: string): AiRecommendation[] {
+        if (this.session && this.session.id === sessionId) {
+            return this.aiRecommendations;
+        }
+        return [];
     }
 
     async start(payload: ScanStartPayload): Promise<void> {
@@ -67,7 +76,8 @@ export class ScanService {
             largeFiles: [],
             staleFiles: [],
             junkFiles: [],
-            emptyFolders: []
+            emptyFolders: [],
+            aiRecommendations: []
         };
 
         this.resetState();
@@ -89,6 +99,7 @@ export class ScanService {
         this.dirQueue = [];
         this.hashQueue = [];
         this.resultFiles.clear();
+        this.aiRecommendations = [];
         this.processedFiles = 0;
         this.processedBytes = 0;
         this.processedHashes = 0;
@@ -255,6 +266,7 @@ export class ScanService {
         }
 
         this.buildDuplicateClusters();
+        this.buildAiRecommendations();
         logger.info('Scan Complete.');
         this.updateState("COMPLETED", true);
         this.terminateWorkers();
@@ -298,6 +310,126 @@ export class ScanService {
         }
         this.session.duplicates = clusters;
         logger.info(`Analysis Finished. Identified ${clusters.length} duplicate clusters.`);
+    }
+
+    private buildAiRecommendations() {
+        if (!this.session) return;
+
+        const files = Array.from(this.resultFiles.values()).filter(f => !f.isDirectory);
+        const buckets = new Map<string, FileNode[]>();
+
+        for (const file of files) {
+            const normalized = this.normalizeName(file.name);
+            if (!normalized) continue;
+            const key = normalized.slice(0, 6);
+            const list = buckets.get(key) || [];
+            list.push(file);
+            buckets.set(key, list);
+        }
+
+        const recommendations: AiRecommendation[] = [];
+        const usedIds = new Set<string>();
+
+        for (const bucket of buckets.values()) {
+            for (let i = 0; i < bucket.length; i++) {
+                const current = bucket[i];
+                if (usedIds.has(current.id)) continue;
+
+                const cluster: FileNode[] = [current];
+                let bestSimilarity = 0;
+                const currentName = this.normalizeName(current.name);
+
+                for (let j = i + 1; j < bucket.length; j++) {
+                    const candidate = bucket[j];
+                    const similarity = this.stringSimilarity(currentName, this.normalizeName(candidate.name));
+                    if (similarity >= 0.88) {
+                        cluster.push(candidate);
+                        bestSimilarity = Math.max(bestSimilarity, similarity);
+                    }
+                }
+
+                if (cluster.length > 1) {
+                    cluster.forEach(f => usedIds.add(f.id));
+                    const { recommended, reason } = this.pickRecommendedFile(cluster);
+                    recommendations.push({
+                        id: `${this.session.id}-${recommended.id}`,
+                        similarFiles: cluster,
+                        recommendedFileId: recommended.id,
+                        reason,
+                        similarity: Math.round(bestSimilarity * 100) / 100
+                    });
+                }
+            }
+        }
+
+        this.aiRecommendations = recommendations;
+        this.session.aiRecommendations = recommendations;
+        logger.info(`AI analysis finished. Generated ${recommendations.length} keep recommendations.`);
+    }
+
+    private pickRecommendedFile(files: FileNode[]): { recommended: FileNode; reason: string } {
+        const recommended = files.reduce((best, candidate) => {
+            if (!best) return candidate;
+            const bestTime = best.mtimeMs ?? 0;
+            const candidateTime = candidate.mtimeMs ?? 0;
+
+            if (candidateTime > bestTime) return candidate;
+            if (candidateTime === bestTime && candidate.sizeBytes > best.sizeBytes) return candidate;
+            if (candidateTime === bestTime && candidate.sizeBytes === best.sizeBytes && candidate.path.length < best.path.length) return candidate;
+            return best;
+        }, files[0]);
+
+        const newestTime = recommended.mtimeMs ? new Date(recommended.mtimeMs).toLocaleString() : null;
+        const largestSize = Math.max(...files.map(f => f.sizeBytes));
+        const reasons: string[] = [];
+
+        if (newestTime) {
+            reasons.push(`Most recently updated (${newestTime})`);
+        }
+        if (recommended.sizeBytes === largestSize) {
+            reasons.push('Largest copy, less likely truncated');
+        }
+        if (reasons.length === 0) {
+            reasons.push('Chosen as the canonical copy for similar names');
+        }
+
+        return { recommended, reason: reasons.join(' • ') };
+    }
+
+    private normalizeName(name: string): string {
+        const parsed = path.parse(name);
+        return parsed.name.toLowerCase().replace(/\d+/g, '').replace(/[\s._-]+/g, ' ').trim();
+    }
+
+    private stringSimilarity(a: string, b: string): number {
+        if (a === b) return 1;
+        if (!a || !b) return 0;
+
+        const matrix: number[][] = Array.from({ length: b.length + 1 }, () => Array.from({ length: a.length + 1 }, () => 0));
+        for (let i = 0; i <= b.length; i++) {
+            matrix[i][0] = i;
+        }
+        for (let j = 0; j <= a.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j - 1] + 1
+                    );
+                }
+            }
+        }
+
+        const distance = matrix[b.length][a.length];
+        const maxLength = Math.max(a.length, b.length);
+        return maxLength === 0 ? 1 : 1 - distance / maxLength;
     }
 
     // --- Actions ---

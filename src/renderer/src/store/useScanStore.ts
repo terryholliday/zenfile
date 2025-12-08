@@ -5,7 +5,8 @@ import {
     SettingsSchema,
     FileNode,
     ScanProgressPayload,
-    DuplicateCluster
+    DuplicateCluster,
+    AiRecommendation
 } from '../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -19,6 +20,7 @@ interface ScanStoreState {
     // Results
     duplicates: DuplicateCluster[];
     largeFiles: FileNode[];
+    aiRecommendations: AiRecommendation[];
 
     // Settings Cache
     settings: SettingsSchema | null;
@@ -46,6 +48,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
 
     duplicates: [],
     largeFiles: [],
+    aiRecommendations: [],
 
     initialize: async () => {
         try {
@@ -155,6 +158,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
                 set({
                     duplicates: session.duplicates,
                     largeFiles: session.largeFiles,
+                    aiRecommendations: session.aiRecommendations ?? [],
                     scanState: session.state
                 });
             }
@@ -173,7 +177,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
             dryRun: settings?.dryRun ?? false
         });
 
-        const { duplicates, largeFiles } = get();
+        const { duplicates, largeFiles, aiRecommendations } = get();
         const newLarge = largeFiles.filter(f => !fileIds.includes(f.id));
 
         // Deep filter duplicates
@@ -182,7 +186,14 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
             files: c.files.filter(f => !fileIds.includes(f.id))
         })).filter(c => c.files.length > 1);
 
-        set({ duplicates: newDups, largeFiles: newLarge });
+        const newAi = aiRecommendations
+            .map(rec => ({
+                ...rec,
+                similarFiles: rec.similarFiles.filter(f => !fileIds.includes(f.id))
+            }))
+            .filter(rec => rec.similarFiles.length > 1 && rec.similarFiles.some(f => f.id === rec.recommendedFileId));
+
+        set({ duplicates: newDups, largeFiles: newLarge, aiRecommendations: newAi });
     },
 
     actionQuarantine: async (fileIds) => {
@@ -195,13 +206,20 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
             dryRun: settings?.dryRun ?? false
         });
 
-        const { duplicates, largeFiles } = get();
+        const { duplicates, largeFiles, aiRecommendations } = get();
         const newLarge = largeFiles.filter(f => !fileIds.includes(f.id));
         const newDups = duplicates.map(c => ({
             ...c,
             files: c.files.filter(f => !fileIds.includes(f.id))
         })).filter(c => c.files.length > 1);
 
-        set({ duplicates: newDups, largeFiles: newLarge });
+        const newAi = aiRecommendations
+            .map(rec => ({
+                ...rec,
+                similarFiles: rec.similarFiles.filter(f => !fileIds.includes(f.id))
+            }))
+            .filter(rec => rec.similarFiles.length > 1 && rec.similarFiles.some(f => f.id === rec.recommendedFileId));
+
+        set({ duplicates: newDups, largeFiles: newLarge, aiRecommendations: newAi });
     }
 }));
