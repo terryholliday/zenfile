@@ -3,10 +3,12 @@ import { twMerge } from 'tailwind-merge'
 import { ScanDashboard } from './components/ScanDashboard'
 import { ResultsDashboard } from './components/ResultsDashboard'
 import { SettingsDashboard } from './components/SettingsDashboard'
+import { OnboardingSequence } from './components/OnboardingSequence'
 import { useScanStore } from './store/useScanStore'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
+  const [showOnboarding, setShowOnboarding] = useState(true)
   const scanState = useScanStore(s => s.scanState);
   const initialize = useScanStore(s => s.initialize);
 
@@ -22,7 +24,11 @@ function App() {
   }, [scanState]);
 
   return (
-    <div className="flex flex-col h-screen font-sans select-none overflow-hidden text-neutral-100">
+    <div className="relative flex flex-col h-screen font-sans select-none overflow-hidden text-neutral-100">
+      {showOnboarding && (
+        <OnboardingSequence onComplete={() => setShowOnboarding(false)} />
+      )}
+
       {/* Title Bar / Header */}
       <header className="flex items-center justify-between px-6 py-4 glass-header drag-region z-50">
         <div className="flex items-center gap-3">
