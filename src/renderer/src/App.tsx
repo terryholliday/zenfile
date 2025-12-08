@@ -3,10 +3,15 @@ import { twMerge } from 'tailwind-merge'
 import { ScanDashboard } from './components/ScanDashboard'
 import { ResultsDashboard } from './components/ResultsDashboard'
 import { SettingsDashboard } from './components/SettingsDashboard'
+import ZenDashboard from './components/ZenDashboard'
 import { useScanStore } from './store/useScanStore'
 
+type Tab = 'scan' | 'results' | 'settings' | 'zen'
+
+const tabs: Tab[] = ['scan', 'results', 'settings', 'zen']
+
 function App() {
-  const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
+  const [activeTab, setActiveTab] = useState<Tab>('scan')
   const scanState = useScanStore(s => s.scanState);
   const initialize = useScanStore(s => s.initialize);
 
@@ -40,11 +45,11 @@ function App() {
 
       {/* Tabs */}
       <div className="px-6 pt-4 pb-2 z-40">
-        <nav className="flex p-1 gap-1 glass-panel rounded-xl no-drag max-w-sm">
-          {['scan', 'results', 'settings'].map((tab) => (
+        <nav className="flex p-1 gap-1 glass-panel rounded-xl no-drag max-w-md">
+          {tabs.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() => setActiveTab(tab)}
               className={twMerge(
                 "flex-1 py-1.5 px-3 rounded-lg text-sm font-medium transition-all duration-200",
                 activeTab === tab
@@ -74,6 +79,12 @@ function App() {
           {activeTab === 'settings' && (
             <div className="h-full overflow-auto">
               <SettingsDashboard />
+            </div>
+          )}
+
+          {activeTab === 'zen' && (
+            <div className="h-full">
+              <ZenDashboard />
             </div>
           )}
         </div>
