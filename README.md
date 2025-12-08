@@ -32,3 +32,7 @@ $ npm run build:mac
 # For Linux
 $ npm run build:linux
 ```
+
+## Database schema
+
+The PostgreSQL schema that powers Filezen's semantic file features lives in `resources/database/schema.sql`. It defines users, files, AI metadata (including vector embeddings), version history, and context clusters ready for a database migration.
