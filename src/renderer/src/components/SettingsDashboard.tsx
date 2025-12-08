@@ -65,6 +65,41 @@ export function SettingsDashboard() {
         </div>
       </section>
 
+      {/* Intelligence */}
+      <section className="space-y-4">
+        <h3 className="text-lg font-semibold text-purple-400 uppercase tracking-wider text-xs">
+          Intelligence
+        </h3>
+
+        <div className="bg-neutral-800/50 p-6 rounded-lg border border-neutral-700 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="block text-base font-medium text-white">Deep Scan OCR</label>
+              <span className="bg-purple-500/20 text-purple-300 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Experimental</span>
+            </div>
+            <p className="text-sm text-neutral-400 max-w-lg">
+              Use AI vision to read text inside images (screenshots, scanned docs).
+              <br />
+              <span className="text-yellow-500/80 text-xs">⚠️ May significantly increase scan time.</span>
+            </p>
+          </div>
+          <button
+            onClick={() => updateSettings({ enableOcr: !settings.enableOcr })}
+            className={clsx(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-neutral-900',
+              settings.enableOcr ? 'bg-purple-600' : 'bg-neutral-700'
+            )}
+          >
+            <span
+              className={clsx(
+                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                settings.enableOcr ? 'translate-x-6' : 'translate-x-1'
+              )}
+            />
+          </button>
+        </div>
+      </section>
+
       {/* Safety */}
       <section className="space-y-4">
         <h3 className="text-lg font-semibold text-emerald-400 uppercase tracking-wider text-xs">

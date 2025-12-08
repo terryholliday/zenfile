@@ -16,9 +16,9 @@ interface ScanStoreState {
   bytesScanned: number
   currentFile?: string
 
-  // Results
   duplicates: DuplicateCluster[]
   largeFiles: FileNode[]
+  files: FileNode[]
 
   // Settings Cache
   settings: SettingsSchema | null
@@ -46,6 +46,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
 
   duplicates: [],
   largeFiles: [],
+  files: [],
 
   initialize: async () => {
     try {
@@ -159,6 +160,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
         set({
           duplicates: session.duplicates,
           largeFiles: session.largeFiles,
+          files: session.files,
           scanState: session.state
         })
       }

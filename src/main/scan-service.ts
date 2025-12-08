@@ -32,24 +32,22 @@ export class ScanService {
   // Queues
   private dirQueue: string[] = []
   private hashQueue: string[] = []
+  private ocrQueue: string[] = []
 
   // Backpressure & Stats
   private activeWorkers = 0
   private processedFiles = 0
   private processedBytes = 0
   private processedHashes = 0
+  private processedOcrDocs = 0
 
   // In-Memory Results
   private resultFiles: Map<string, FileNode> = new Map()
+  private currentSettings: any = null // SettingsSchema
 
   constructor() {}
 
-  getResults(sessionId: string): ScanSession | null {
-    if (this.session && this.session.id === sessionId) {
-      return this.session
-    }
-    return null
-  }
+  // ...
 
   async start(payload: ScanStartPayload): Promise<void> {
     if (this.session && this.session.state === 'SCANNING') {
@@ -58,18 +56,10 @@ export class ScanService {
     }
 
     logger.info('Starting Scan Session', { paths: payload.paths })
+    this.currentSettings = payload.settings
 
-    this.session = {
-      id: payload.sessionId,
-      startedAt: new Date().toISOString(),
-      state: 'IDLE',
-      duplicates: [],
-      largeFiles: [],
-      staleFiles: [],
-      junkFiles: [],
-      emptyFolders: []
-    }
-
+    // ... existing initialization ...
+    
     this.resetState()
     this.dirQueue.push(...payload.paths)
     await this.initializeWorkers()
@@ -77,88 +67,13 @@ export class ScanService {
     this.processQueue()
   }
 
-  cancel() {
-    if (!this.session) return
-    logger.info('Cancelling scan')
-    this.updateState('CANCELLING', true)
-    this.terminateWorkers()
-    this.updateState('COMPLETED', true)
-  }
-
-  private resetState() {
-    this.dirQueue = []
-    this.hashQueue = []
-    this.resultFiles.clear()
-    this.processedFiles = 0
-    this.processedBytes = 0
-    this.processedHashes = 0
-    this.activeWorkers = 0
-    this.lastUpdate = 0
-  }
-
-  private async initializeWorkers() {
-    this.terminateWorkers()
-
-    const workerPath = app.isPackaged
-      ? path.join(__dirname, 'worker.js')
-      : path.join(__dirname, '../../out/main/worker.js')
-
-    for (let i = 0; i < WORKER_POOL_SIZE; i++) {
-      const worker = new Worker(workerPath)
-      worker.on('message', (msg: WorkerResponse) => this.handleWorkerMessage(i, msg))
-      worker.on('error', (err) => logger.error(`Worker ${i} error`, { error: err.message }))
-      worker.on('exit', (code) => {
-        if (code !== 0 && this.session?.state !== 'CANCELLING') {
-          logger.error(`Worker ${i} exited with code ${code}`)
-        }
-      })
-      this.workers.push(worker)
-      this.workerReadyState.push(false)
-    }
-  }
-
-  private terminateWorkers() {
-    this.workers.forEach((w) => w.terminate())
-    this.workers = []
-    this.workerReadyState = []
-  }
-
-  private updateState(newState: ScannerState, force = false) {
-    if (!this.session) return
-    this.session.state = newState
-
-    const now = Date.now()
-    // Throttle IPC updates for progress only (every 200ms)
-    // Always send state changes (e.g. COMPLETED or IDLE) immediately unless forced
-    if (!force && newState === 'SCANNING' && now - this.lastUpdate < 200) {
-      return
-    }
-    this.lastUpdate = now
-
-    const progress: ScanProgressPayload = {
-      sessionId: this.session.id,
-      state: newState,
-      filesScanned: this.processedFiles,
-      bytesScanned: this.processedBytes,
-      currentFile: this.session.state === 'SCANNING' ? this.getLastScannedFile() : undefined
-    }
-
-    const wins = BrowserWindow.getAllWindows()
-    wins.forEach((w) => w.webContents.send(IpcChannel.ScanProgress, progress))
-  }
-
-  private getLastScannedFile(): string | undefined {
-    if (this.resultFiles.size === 0) return undefined
-    // In Map, iteration order is insertion order
-    const lastEntry = Array.from(this.resultFiles)[this.resultFiles.size - 1] // Inefficient but simple for now
-    return lastEntry ? lastEntry[1].path : undefined
-  }
+  // ...
 
   private processQueue() {
     if (!this.session || this.session.state !== 'SCANNING') return
 
     // Completion Check
-    if (this.dirQueue.length === 0 && this.hashQueue.length === 0 && this.activeWorkers === 0) {
+    if (this.dirQueue.length === 0 && this.hashQueue.length === 0 && this.ocrQueue.length === 0 && this.activeWorkers === 0) {
       if (this.session.duplicates.length === 0 && this.processedFiles > 0) {
         this.finalizeScan()
       } else {
@@ -168,51 +83,10 @@ export class ScanService {
       return
     }
 
-    // Hashing Priority
-    while (this.hashQueue.length > 0 && this.activeWorkers < this.workers.length) {
-      const nextPath = this.hashQueue.shift()
-      if (nextPath) {
-        const workerIndex = this.activeWorkers % this.workers.length
-        const msg: WorkerCommand = { type: WorkerMessageType.CMD_HASH_FILE, filePath: nextPath }
-        this.workers[workerIndex].postMessage(msg)
-        this.activeWorkers++
-      }
-    }
-
-    // Directory Scanning
-    while (this.dirQueue.length > 0 && this.activeWorkers < this.workers.length) {
-      const nextPath = this.dirQueue.shift()
-      if (nextPath) {
-        const workerIndex = this.processedFiles % this.workers.length
-        const msg: WorkerCommand = { type: WorkerMessageType.CMD_SCAN_DIR, path: nextPath }
-        this.workers[workerIndex].postMessage(msg)
-        this.activeWorkers++
-      }
-    }
+    // ... (rest of processQueue)
   }
 
-  private handleWorkerMessage(index: number, msg: WorkerResponse) {
-    switch (msg.type) {
-      case WorkerMessageType.RES_READY:
-        this.workerReadyState[index] = true
-        break
-      case WorkerMessageType.RES_SCAN_RESULT:
-        this.activeWorkers--
-        this.handleScanResult(msg)
-        this.processQueue()
-        break
-      case WorkerMessageType.RES_HASH_RESULT:
-        this.activeWorkers--
-        this.handleHashResult(msg)
-        this.processQueue()
-        break
-      case WorkerMessageType.RES_ERROR:
-        this.activeWorkers--
-        logger.warn(`Worker Error: ${msg.error} at ${msg.path}`)
-        this.processQueue()
-        break
-    }
-  }
+  // ...
 
   private handleScanResult(res: ScanResultResponse) {
     if (!this.session) return
@@ -223,6 +97,14 @@ export class ScanService {
       this.processedBytes += f.sizeBytes
       if (f.sizeBytes > 100 * 1024 * 1024) {
         this.session?.largeFiles.push(f)
+      }
+      
+      // OCR Queue Logic
+      if (this.currentSettings?.enableOcr) {
+          const ext = path.extname(f.name).toLowerCase()
+          if (['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp'].includes(ext)) {
+              this.ocrQueue.push(f.path)
+          }
       }
     })
 
@@ -297,6 +179,7 @@ export class ScanService {
       }
     }
     this.session.duplicates = clusters
+    this.session.files = Array.from(this.resultFiles.values()) // Populate all files
     logger.info(`Analysis Finished. Identified ${clusters.length} duplicate clusters.`)
   }
 
@@ -360,6 +243,59 @@ export class ScanService {
         success.push(id)
       } catch (err: any) {
         logger.error(`Failed to quarantine ${file.path}`, { error: err.message })
+        failures.push(id)
+      }
+    }
+    return { success, failures }
+  }
+
+  async moveFiles(payload: ActionPayload & { destination: string }): Promise<{ success: string[]; failures: string[] }> {
+    const success: string[] = []
+    const failures: string[] = []
+    
+    // Ensure dest exists
+    try {
+        if (!payload.dryRun) {
+            await fs.mkdir(payload.destination, { recursive: true })
+        }
+    } catch (err) {
+        logger.error(`Failed to create dest dir ${payload.destination}`)
+        return { success: [], failures: payload.fileIds }
+    }
+
+    for (const id of payload.fileIds) {
+      const file = this.resultFiles.get(id)
+      if (!file) {
+        failures.push(id)
+        continue
+      }
+
+      if (payload.dryRun) {
+        logger.info(`[DryRun] Would move ${file.path} to ${payload.destination}`)
+        success.push(id)
+        continue
+      }
+
+      try {
+        const destPath = path.join(payload.destination, path.basename(file.path))
+        
+        // Prevent overwrite
+        // TODO: Handle overwrite logic or rename strategy
+        try {
+            await fs.access(destPath)
+            // If we get here, file exists. Fail for now.
+            logger.warn(`Destination exists for ${file.path}`)
+            failures.push(id)
+            continue
+        } catch {
+            // File does not exist, proceed
+        }
+
+        await fs.rename(file.path, destPath)
+        this.resultFiles.delete(id)
+        success.push(id)
+      } catch (err: any) {
+        logger.error(`Failed to move ${file.path}`, { error: err.message })
         failures.push(id)
       }
     }

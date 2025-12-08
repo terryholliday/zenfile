@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { twMerge } from 'tailwind-merge'
 import { ScanDashboard } from './components/ScanDashboard'
 import { ResultsDashboard } from './components/ResultsDashboard'
+import { OrganizeDashboard } from './components/OrganizeDashboard'
 import { SettingsDashboard } from './components/SettingsDashboard'
 import { useScanStore } from './store/useScanStore'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
+  const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'organize' | 'settings'>('scan')
   const scanState = useScanStore(s => s.scanState);
   const initialize = useScanStore(s => s.initialize);
 
@@ -41,7 +42,7 @@ function App() {
       {/* Tabs */}
       <div className="px-6 pt-4 pb-2 z-40">
         <nav className="flex p-1 gap-1 glass-panel rounded-xl no-drag max-w-sm">
-          {['scan', 'results', 'settings'].map((tab) => (
+          {['scan', 'results', 'organize', 'settings'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -69,6 +70,12 @@ function App() {
 
           {activeTab === 'results' && (
             <ResultsDashboard />
+          )}
+
+          {activeTab === 'organize' && (
+            <div className="h-full overflow-hidden">
+              <OrganizeDashboard />
+            </div>
           )}
 
           {activeTab === 'settings' && (

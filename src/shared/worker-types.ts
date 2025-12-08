@@ -4,9 +4,11 @@ export enum WorkerMessageType {
   CMD_SCAN_DIR = 'CMD_SCAN_DIR',
   CMD_HASH_FILE = 'CMD_HASH_FILE',
   CMD_TERMINATE = 'CMD_TERMINATE',
+  CMD_OCR_FILE = 'CMD_OCR_FILE',
 
   RES_SCAN_RESULT = 'RES_SCAN_RESULT',
   RES_HASH_RESULT = 'RES_HASH_RESULT',
+  RES_OCR_RESULT = 'RES_OCR_RESULT',
   RES_ERROR = 'RES_ERROR',
   RES_READY = 'RES_READY'
 }
@@ -25,7 +27,12 @@ export interface TerminateCommand {
   type: WorkerMessageType.CMD_TERMINATE
 }
 
-export type WorkerCommand = ScanDirCommand | HashFileCommand | TerminateCommand
+export interface OcrFileCommand {
+  type: WorkerMessageType.CMD_OCR_FILE
+  filePath: string
+}
+
+export type WorkerCommand = ScanDirCommand | HashFileCommand | TerminateCommand | OcrFileCommand
 
 export interface ScanResultResponse {
   type: WorkerMessageType.RES_SCAN_RESULT
@@ -39,6 +46,12 @@ export interface HashResultResponse {
   hash: string
 }
 
+export interface OcrResultResponse {
+  type: WorkerMessageType.RES_OCR_RESULT
+  filePath: string
+  text: string
+}
+
 export interface ErrorResponse {
   type: WorkerMessageType.RES_ERROR
   error: string
@@ -50,4 +63,4 @@ export interface ReadyResponse {
   type: WorkerMessageType.RES_READY
 }
 
-export type WorkerResponse = ScanResultResponse | HashResultResponse | ErrorResponse | ReadyResponse
+export type WorkerResponse = ScanResultResponse | HashResultResponse | ErrorResponse | ReadyResponse | OcrResultResponse

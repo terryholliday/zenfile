@@ -25,6 +25,10 @@ export interface FileNode {
   isDirectory: boolean
   hash?: string // SHA-256
   tags: FileTag[]
+  metadata?: {
+    text?: string // OCR content
+    lastIndex?: number // Timestamp of last index
+  }
 }
 
 export interface DuplicateCluster {
@@ -62,6 +66,7 @@ export interface SettingsSchema {
   excludePaths: string[]
   dryRun: boolean
   isDarkTheme: boolean
+  enableOcr: boolean
 }
 
 export interface ScanSession {
@@ -73,6 +78,7 @@ export interface ScanSession {
   staleFiles: FileNode[]
   junkFiles: FileNode[]
   emptyFolders: FileNode[]
+  files: FileNode[] // All scanned files (for AI analysis)
 }
 
 // IPC Payloads
@@ -111,4 +117,18 @@ export interface FileZenApi {
   moveFiles(
     payload: ActionPayload & { destination: string }
   ): Promise<{ success: string[]; failures: string[] }>
+}
+
+// --- AI / Smart Stack Types ---
+
+export type StackType = 'DATE' | 'PROJECT' | 'FILE_TYPE' | 'CUSTOM'
+
+export interface SmartStack {
+  id: string
+  label: string // e.g. "2024 Tax Docs"
+  type: StackType
+  confidence: number // 0-1
+  files: FileNode[]
+  reason: string // "Matches 'Tax' keyword and year 2024"
+  action: 'MOVE' | 'ZIP' | 'DELETE' | 'NONE'
 }

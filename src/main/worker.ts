@@ -3,12 +3,23 @@ import fs from 'fs/promises'
 import { createReadStream } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import { createWorker } from 'tesseract.js'
 import { WorkerMessageType, WorkerCommand, WorkerResponse } from '../shared/worker-types'
 import { FileNode } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
 if (!parentPort) {
   throw new Error('Worker must be spawned with parentPort')
+}
+
+// OCR Worker instance (lazy loaded)
+let ocrWorker: any = null
+
+async function getOcrWorker() {
+  if (!ocrWorker) {
+    ocrWorker = await createWorker('eng')
+  }
+  return ocrWorker
 }
 
 parentPort.postMessage({ type: WorkerMessageType.RES_READY })
@@ -22,7 +33,13 @@ parentPort.on('message', async (command: WorkerCommand) => {
       case WorkerMessageType.CMD_HASH_FILE:
         await handleHashFile(command.filePath)
         break
+      case WorkerMessageType.CMD_OCR_FILE:
+        await handleOcrFile(command.filePath)
+        break
       case WorkerMessageType.CMD_TERMINATE:
+        if (ocrWorker) {
+            await ocrWorker.terminate()
+        }
         process.exit(0)
         break
     }
@@ -36,6 +53,29 @@ parentPort.on('message', async (command: WorkerCommand) => {
     parentPort?.postMessage(errorResponse)
   }
 })
+
+async function handleOcrFile(filePath: string) {
+    try {
+        const worker = await getOcrWorker()
+        const { data: { text } } = await worker.recognize(filePath)
+        
+        const response: WorkerResponse = {
+            type: WorkerMessageType.RES_OCR_RESULT,
+            filePath,
+            text: text.trim().substring(0, 1000) // Limit to 1KB for now
+        }
+        parentPort?.postMessage(response)
+    } catch (err: any) {
+        // OCR might fail on some images, just log error
+        const response: WorkerResponse = {
+            type: WorkerMessageType.RES_ERROR,
+            error: `OCR Failed: ${err.message}`,
+            path: filePath,
+            fatal: false
+        }
+        parentPort?.postMessage(response)
+    }
+}
 
 async function handleScanDir(dirPath: string) {
   try {
@@ -61,6 +101,7 @@ async function handleScanDir(dirPath: string) {
             mtimeMs: stats.mtimeMs,
             isDirectory: false,
             tags: []
+            // metadata is optional so no change needed here for now
           })
         } catch (statErr) {
           // Ignore files we can't stat (race conditions etc)

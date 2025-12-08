@@ -80,6 +80,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle(IpcChannel.ActionTrash, (_, payload) => scanService.moveToTrash(payload))
   ipcMain.handle(IpcChannel.ActionQuarantine, (_, payload) => scanService.quarantine(payload))
+  ipcMain.handle(IpcChannel.ActionMove, (_, payload) => scanService.moveFiles(payload))
   ipcMain.handle(IpcChannel.GetResults, (_, sessionId) => scanService.getResults(sessionId))
 
   createWindow()
