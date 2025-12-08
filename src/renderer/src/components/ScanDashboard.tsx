@@ -2,10 +2,19 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useScanStore } from '../store/useScanStore'
 import clsx from 'clsx'
-import { ZEN_QUOTES } from '../utils/quotes'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { Stars, Sparkles, Float } from '@react-three/drei'
-import * as THREE from 'three'
+
+const ZEN_QUOTES = [
+  'Order is the sanity of the mind, the health of the body, the peace of the city.',
+  'Simplifying your life is about finding the balance between what you need and what you want.',
+  'Clutter is nothing more than postponed decisions.',
+  'Simplicity is the ultimate sophistication.',
+  'For every minute spent organizing, an hour is earned.',
+  'The objective of cleaning is not just to clean, but to feel happiness living within that environment.',
+  'Clear your space, clear your mind.',
+  'Digital minimalism is about focusing on what truly matters.'
+];
 
 // --- Galaxy Builder Component ---
 function ScanGalaxy({ fileCount }: { fileCount: number }) {
@@ -261,7 +270,8 @@ export function ScanDashboard() {
           )}
         </div>
       </div>
-      )
+    </div>
+  )
 }
 
-      export default ScanDashboard
+export default ScanDashboard
