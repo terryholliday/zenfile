@@ -50,7 +50,7 @@ export function ScanDashboard() {
   return (
     <div className="flex flex-col items-center justify-center space-y-8 min-h-[400px] w-full max-w-2xl mx-auto">
       {/* Progress Ring / Status Indicator */}
-      <div className="relative w-72 h-72 flex items-center justify-center">
+      <div className="relative w-60 h-60 flex items-center justify-center">
         {/* Background Ring */}
         <div className="absolute inset-0 rounded-full border-4 border-white/5" />
 
@@ -88,41 +88,41 @@ export function ScanDashboard() {
         />
 
         {/* Center Content */}
-        <div className="text-center z-10 p-8 glass-panel rounded-full w-48 h-48 flex flex-col items-center justify-center backdrop-blur-3xl shadow-2xl border-white/10">
+        <div className="text-center z-10 p-6 glass-panel rounded-full w-40 h-40 flex flex-col items-center justify-center backdrop-blur-3xl shadow-2xl border-white/10">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             key={scanState}
             className="flex flex-col items-center"
           >
-            <h3 className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">
+            <h3 className="text-2xl font-black text-white tracking-tighter drop-shadow-lg">
               {scanState === 'IDLE'
                 ? 'READY'
                 : scanState === 'SCANNING'
-                  ? 'ZEN MDOE'
+                  ? 'ZEN MODE'
                   : scanState === 'COMPLETED'
                     ? 'DONE'
                     : scanState}
             </h3>
-            <p className="text-indigo-200 text-xs mt-2 uppercase tracking-widest font-bold">
+            <p className="text-indigo-200 text-[10px] mt-1 uppercase tracking-widest font-bold">
               {scanState === 'SCANNING'
-                ? 'Harmonizing Files'
+                ? 'Harmonizing'
                 : 'System Idle'}
             </p>
           </motion.div>
         </div>
       </div>
 
-      {/* Zen Quote */}
+      {/* Zen Quote - Larger and simpler */}
       {isScanning && (
         <motion.div
           key={quote}
-          initial={{ opacity: 0, y: 5 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className="h-12 text-center max-w-md"
+          className="h-20 flex items-center justify-center text-center max-w-lg px-4"
         >
-          <p className="text-sm text-indigo-200/80 italic font-medium">&quot;{quote}&quot;</p>
+          <p className="text-xl md:text-2xl text-indigo-100 font-light leading-relaxed">&quot;{quote}&quot;</p>
         </motion.div>
       )}
 
@@ -184,14 +184,14 @@ export function ScanDashboard() {
           )}
         </div>
 
-        {/* Live Scan Results (Subtle in Zen Mode) */}
+        {/* Live Scan Results (More Visible) */}
         {isScanning && currentFile && (
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
-            className="w-full text-center"
+            animate={{ opacity: 1 }}
+            className="w-full text-center p-2 rounded-lg bg-black/20"
           >
-            <div className="text-neutral-500 font-mono text-[10px] truncate max-w-xs mx-auto" title={currentFile}>
+            <div className="text-indigo-300 font-mono text-xs truncate max-w-md mx-auto" title={currentFile}>
               {currentFile}
             </div>
           </motion.div>

@@ -3,7 +3,7 @@ import { useScanStore } from '../store/useScanStore'
 import { ResultsList } from './ResultsList'
 import { ZenGalaxy } from './ZenGalaxy'
 import { DuplicateComparison } from './DuplicateComparison'
-import { DuplicateCluster } from '../../../shared/types'
+import { DuplicateCluster, FileNode } from '../../../shared/types'
 import { AnimatePresence } from 'framer-motion'
 
 export function ResultsDashboard() {
@@ -42,6 +42,13 @@ export function ResultsDashboard() {
     }
     setSelectedCluster(null);
   };
+
+  const handleFileSelect = (file: FileNode) => {
+    if (view === 'duplicates') {
+      const cluster = duplicates.find(c => c.files.some(f => f.id === file.id));
+      if (cluster) setSelectedCluster(cluster);
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-transparent">
@@ -108,15 +115,15 @@ export function ResultsDashboard() {
           <ZenGalaxy onClusterSelect={setSelectedCluster} />
         ) : (
           <div className="absolute inset-0 p-4">
-            <div className="h-full bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
+            <div className="h-full bg-neutral-950/50 rounded-lg border border-white/5 overflow-hidden backdrop-blur-sm">
               {view === 'duplicates' && (
                 <div className="h-full flex flex-col">
-                  <div className="p-2 bg-neutral-900 border-b border-neutral-800 text-xs text-neutral-500 flex justify-between">
+                  <div className="p-2 bg-white/5 border-b border-white/5 text-xs text-neutral-400 flex justify-between">
                     <span>
                       Found {duplicateFiles.length} files in {duplicates.length} clusters
                     </span>
                   </div>
-                  <ResultsList files={duplicateFiles} />
+                  <ResultsList files={duplicateFiles} onSelect={handleFileSelect} />
                 </div>
               )}
 
