@@ -1,5 +1,5 @@
 import { FileNode, FileTag } from '../shared/types'
-import path from 'path'
+import { privacyService } from './privacy-service'
 
 interface TagRule {
   tag: FileTag
@@ -36,14 +36,15 @@ export class TagEngine {
     }
   ]
 
-import { privacyService } from './privacy-service'
-
-// ... existing code ...
-
   analyze(file: FileNode): FileTag[] {
     const tags: Set<FileTag> = new Set()
     const content = `${file.name} ${file.metadata?.text || ''}`
     const lowerContent = content.toLowerCase()
+
+    const sensitiveMatches = privacyService.detect(content)
+    if (sensitiveMatches.length > 0) {
+      tags.add('SENSITIVE')
+    }
 
     for (const rule of this.rules) {
       if (this.matchesRule(lowerContent, rule)) {

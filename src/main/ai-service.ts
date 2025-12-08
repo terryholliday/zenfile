@@ -2,7 +2,7 @@ import { pipeline, Pipeline } from '@xenova/transformers'
 import { create, insert, search, type Orama } from '@orama/orama'
 import { app } from 'electron'
 import path from 'path'
-import { FileNode } from '../shared/types'
+import { AiSearchHit, FileNode } from '../shared/types'
 import { logger } from './logger'
 
 // Type definition for vector storage schema
@@ -88,7 +88,7 @@ export class AiService {
     }
   }
 
-  async search(query: string) {
+  async search(query: string): Promise<AiSearchHit[]> {
     if (!this.db) await this.initialize()
 
     const queryEmbedding = await this.generateEmbedding(query)
@@ -104,10 +104,10 @@ export class AiService {
         limit: 10
     })
 
-    return results.hits.map(hit => ({
-        id: hit.document.id,
-        path: hit.document.path,
-        score: hit.score
+    return results.hits.map((hit) => ({
+      id: hit.document.id,
+      path: hit.document.path,
+      score: hit.score
     }))
   }
 }
