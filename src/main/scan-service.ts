@@ -108,7 +108,9 @@ export class ScanService {
             worker.on('message', (msg: WorkerResponse) => this.handleWorkerMessage(i, msg));
             worker.on('error', (err) => logger.error(`Worker ${i} error`, { error: err.message }));
             worker.on('exit', (code) => {
-                if (code !== 0) logger.error(`Worker ${i} exited with code ${code}`);
+                if (code !== 0 && this.session?.state !== "CANCELLING") {
+                    logger.error(`Worker ${i} exited with code ${code}`);
+                }
             });
             this.workers.push(worker);
             this.workerReadyState.push(false);
@@ -134,8 +136,6 @@ export class ScanService {
         this.lastUpdate = now;
 
         const progress: ScanProgressPayload = {
-            sessionId: this.session.id,
-            state: newState,
             sessionId: this.session.id,
             state: newState,
             filesScanned: this.processedFiles,
