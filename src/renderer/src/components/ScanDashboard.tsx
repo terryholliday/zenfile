@@ -10,7 +10,8 @@ export function ScanDashboard() {
         settings,
         setIncludePath,
         startScan,
-        cancelScan
+        cancelScan,
+        currentFile
     } = useScanStore();
 
     const isScanning = scanState === 'SCANNING';
@@ -92,14 +93,8 @@ export function ScanDashboard() {
                         </div>
                         <button
                             onClick={async () => {
-                                console.log('Clicked Change Directory');
-                                try {
-                                    const path = await window.fileZen.openDirectory();
-                                    console.log('Got path:', path);
-                                    if (path) setIncludePath(path);
-                                } catch (e) {
-                                    console.error('Failed to open directory:', e);
-                                }
+                                const path = await window.fileZen.openDirectory();
+                                if (path) setIncludePath(path);
                             }}
                             className="px-4 py-2 text-sm bg-neutral-700 hover:bg-neutral-600 text-white rounded transition-colors"
                         >
@@ -126,6 +121,23 @@ export function ScanDashboard() {
                         </button>
                     )}
                 </div>
+
+                {/* Live Scan Results */}
+                {isScanning && currentFile && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="w-full max-w-xl mt-4 px-4 py-3 bg-neutral-900/50 rounded-md border border-neutral-800"
+                    >
+                        <div className="flex items-center gap-2 text-xs text-neutral-500 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="uppercase tracking-wider font-bold">Processing</span>
+                        </div>
+                        <div className="text-neutral-300 font-mono text-xs truncate" title={currentFile}>
+                            {currentFile}
+                        </div>
+                    </motion.div>
+                )}
             </div>
 
         </div>

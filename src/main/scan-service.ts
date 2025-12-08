@@ -136,12 +136,22 @@ export class ScanService {
         const progress: ScanProgressPayload = {
             sessionId: this.session.id,
             state: newState,
+            sessionId: this.session.id,
+            state: newState,
             filesScanned: this.processedFiles,
-            bytesScanned: this.processedBytes
+            bytesScanned: this.processedBytes,
+            currentFile: this.session.state === "SCANNING" ? this.getLastScannedFile() : undefined
         };
 
         const wins = BrowserWindow.getAllWindows();
         wins.forEach(w => w.webContents.send(IpcChannel.ScanProgress, progress));
+    }
+
+    private getLastScannedFile(): string | undefined {
+        if (this.resultFiles.size === 0) return undefined;
+        // In Map, iteration order is insertion order
+        const lastEntry = Array.from(this.resultFiles)[this.resultFiles.size - 1]; // Inefficient but simple for now
+        return lastEntry ? lastEntry[1].path : undefined;
     }
 
     private processQueue() {
