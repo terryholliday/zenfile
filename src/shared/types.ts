@@ -32,6 +32,14 @@ export interface DuplicateCluster {
     files: FileNode[];
 }
 
+export interface AiRecommendation {
+    id: string;
+    similarFiles: FileNode[];
+    recommendedFileId: string;
+    reason: string;
+    similarity: number; // 0 - 1 similarity score of the names
+}
+
 export interface Anchor {
     id: string;             // Folder ID or Path hash
     path: string;           // Folder Path
@@ -73,6 +81,7 @@ export interface ScanSession {
     staleFiles: FileNode[];
     junkFiles: FileNode[];
     emptyFolders: FileNode[];
+    aiRecommendations: AiRecommendation[];
 }
 
 // IPC Payloads
@@ -107,6 +116,6 @@ export interface FileZenApi {
     saveSettings(settings: SettingsSchema): Promise<void>;
     openDirectory(): Promise<string | null>;
     getResults(sessionId: string): Promise<ScanSession | null>;
-    getSuggestions(sessionId: string): Promise<Suggestion[]>;
+    getSuggestions(sessionId: string): Promise<AiRecommendation[]>;
     moveFiles(payload: ActionPayload & { destination: string }): Promise<{ success: string[]; failures: string[] }>;
 }
