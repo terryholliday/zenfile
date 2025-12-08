@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useScanStore } from '../store/useScanStore';
 import { ResultsList } from './ResultsList';
+import { ZenFlow } from './ZenFlow';
 
 export function ResultsDashboard() {
     const { duplicates, largeFiles } = useScanStore();
     const [view, setView] = useState<'duplicates' | 'large'>('duplicates');
+    const [duplicateMode, setDuplicateMode] = useState<'flow' | 'list'>('flow');
 
     // Flatten duplicates for the list
     // Each duplicate cluster has multiple files. 
@@ -66,11 +68,34 @@ export function ResultsDashboard() {
                 <div className="h-full bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden">
                     {view === 'duplicates' && (
                         <div className="h-full flex flex-col">
-                            {/* In a real app we would group these visually. For MVP list. */}
-                            <div className="p-2 bg-neutral-900 border-b border-neutral-800 text-xs text-neutral-500 flex justify-between">
-                                <span>Found {duplicateFiles.length} files in {duplicates.length} clusters</span>
+                            <div className="p-3 bg-neutral-900 border-b border-neutral-800 text-xs text-neutral-300 flex justify-between items-center">
+                                <div>
+                                    <span className="text-neutral-500">Found {duplicateFiles.length} files in {duplicates.length} clusters</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="text-neutral-500">Mode</span>
+                                    <div className="inline-flex rounded-full border border-neutral-700 bg-neutral-950 p-1">
+                                        <button
+                                            onClick={() => setDuplicateMode('flow')}
+                                            className={`px-3 py-1 rounded-full ${duplicateMode === 'flow' ? 'bg-indigo-600 text-white shadow' : 'text-neutral-400 hover:text-neutral-200'}`}
+                                        >
+                                            Zen Flow
+                                        </button>
+                                        <button
+                                            onClick={() => setDuplicateMode('list')}
+                                            className={`px-3 py-1 rounded-full ${duplicateMode === 'list' ? 'bg-neutral-800 text-white shadow-inner' : 'text-neutral-400 hover:text-neutral-200'}`}
+                                        >
+                                            Table
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            <ResultsList files={duplicateFiles} />
+
+                            {duplicateMode === 'flow' ? (
+                                <ZenFlow duplicateClusters={duplicates} largeFiles={largeFiles} />
+                            ) : (
+                                <ResultsList files={duplicateFiles} />
+                            )}
                         </div>
                     )}
 
