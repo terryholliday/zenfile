@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { twMerge } from 'tailwind-merge'
 import { ScanDashboard } from './components/ScanDashboard'
 import { ResultsDashboard } from './components/ResultsDashboard'
+import { SettingsDashboard } from './components/SettingsDashboard'
 import { useScanStore } from './store/useScanStore'
 
 function App() {
@@ -64,9 +65,8 @@ function App() {
           )}
 
           {activeTab === 'settings' && (
-            <div className="p-6 space-y-4">
-              <h2 className="text-2xl font-bold">Settings</h2>
-              <p className="text-neutral-400">No settings available yet.</p>
+            <div className="h-full overflow-auto">
+              <SettingsDashboard />
             </div>
           )}
         </div>
