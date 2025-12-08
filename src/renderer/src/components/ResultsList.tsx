@@ -5,6 +5,7 @@ import { useScanStore } from '../store/useScanStore'
 
 interface ResultsListProps {
   files: FileNode[]
+  onSelect?: (file: FileNode) => void
 }
 
 const ResultRow = memo(
@@ -12,22 +13,27 @@ const ResultRow = memo(
     file,
     index,
     onTrash,
-    onQuarantine
+    onQuarantine,
+    onSelect
   }: {
     file: FileNode
     index: number
     onTrash: (e: any, id: string) => void
     onQuarantine: (e: any, id: string) => void
+    onSelect?: (file: FileNode) => void
   }) => (
-    <div className="flex items-center gap-4 p-2 border-b border-neutral-800 hover:bg-neutral-800/50 text-sm group">
+    <div
+      onClick={() => onSelect?.(file)}
+      className={`flex items-center gap-4 p-2 border-b border-white/5 hover:bg-white/5 text-sm group transition-colors ${onSelect ? 'cursor-pointer' : ''}`}
+    >
       <div className="w-8 text-neutral-500 text-xs text-right">{index + 1}</div>
 
       <div className="flex-1 truncate">
-        <div className="text-neutral-200 truncate font-medium">{file.name}</div>
-        <div className="text-neutral-500 text-xs truncate">{file.path}</div>
+        <div className="text-neutral-200 truncate font-medium group-hover:text-white transition-colors">{file.name}</div>
+        <div className="text-neutral-500 text-xs truncate font-mono opacity-70">{file.path}</div>
       </div>
 
-      <div className="w-24 text-right text-indigo-400 font-mono text-xs">
+      <div className="w-24 text-right text-indigo-300 font-mono text-xs">
         {(file.sizeBytes / 1024 / 1024).toFixed(2)} MB
       </div>
 
@@ -35,14 +41,14 @@ const ResultRow = memo(
       <div className="w-32 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={(e) => onQuarantine(e, file.id)}
-          className="px-2 py-1 bg-amber-900/30 text-amber-500 text-xs rounded hover:bg-amber-900/50"
+          className="px-2 py-1 bg-amber-500/10 text-amber-500 text-xs rounded hover:bg-amber-500/20 transition-colors"
           title="Quarantine"
         >
           Q
         </button>
         <button
           onClick={(e) => onTrash(e, file.id)}
-          className="px-2 py-1 bg-red-900/30 text-red-500 text-xs rounded hover:bg-red-900/50"
+          className="px-2 py-1 bg-red-500/10 text-red-400 text-xs rounded hover:bg-red-500/20 transition-colors"
           title="Trash"
         >
           Trash
@@ -52,13 +58,14 @@ const ResultRow = memo(
   )
 )
 
-export function ResultsList({ files }: ResultsListProps) {
+export function ResultsList({ files, onSelect }: ResultsListProps) {
   const { actionTrash, actionQuarantine } = useScanStore()
 
   if (files.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-neutral-500">
-        No files found.
+      <div className="flex flex-col items-center justify-center h-full text-neutral-500 animate-pulse">
+        <div className="text-4xl mb-4">📭</div>
+        <p className="font-medium">No files found</p>
       </div>
     )
   }
@@ -76,7 +83,7 @@ export function ResultsList({ files }: ResultsListProps) {
   }
 
   return (
-    <div className="h-full w-full bg-neutral-900">
+    <div className="h-full w-full bg-transparent">
       <Virtuoso
         style={{ height: '100%' }}
         data={files}
@@ -86,6 +93,7 @@ export function ResultsList({ files }: ResultsListProps) {
             file={file}
             onTrash={handleTrash}
             onQuarantine={handleQuarantine}
+            onSelect={onSelect}
           />
         )}
       />

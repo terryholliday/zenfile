@@ -7,62 +7,69 @@ import { useScanStore } from './store/useScanStore'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
-  const scanState = useScanStore((s) => s.scanState)
-  const initialize = useScanStore((s) => s.initialize)
+  const scanState = useScanStore(s => s.scanState);
+  const initialize = useScanStore(s => s.initialize);
 
   useEffect(() => {
-    initialize()
-  }, [])
+    initialize();
+  }, []);
 
   // Auto-switch to results when done
   useEffect(() => {
     if (scanState === 'COMPLETED') {
-      setActiveTab('results')
+      setActiveTab('results');
     }
-  }, [scanState])
+  }, [scanState]);
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-900 text-neutral-100 font-sans select-none overflow-hidden">
+    <div className="flex flex-col h-screen font-sans select-none overflow-hidden text-neutral-100">
       {/* Title Bar / Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-neutral-800 border-b border-neutral-700 drag-region">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-indigo-500" />
-          <h1 className="text-sm font-semibold tracking-wide uppercase text-neutral-400">
-            FileZen
-          </h1>
+      <header className="flex items-center justify-between px-6 py-4 glass-header drag-region z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+            <div className="w-3 h-3 bg-white rounded-full opacity-90" />
+          </div>
+          <h1 className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">FileZen</h1>
+        </div>
+
+        {/* Status Indicator */}
+        <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-xs font-medium text-neutral-400">
+          {scanState === 'IDLE' ? 'Ready' : scanState}
         </div>
       </header>
 
       {/* Tabs */}
-      <nav className="flex items-center px-4 pt-4 gap-4 no-drag">
-        {['scan', 'results', 'settings'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
-            className={twMerge(
-              'pb-2 text-sm font-medium transition-colors border-b-2',
-              activeTab === tab
-                ? 'border-indigo-500 text-white'
-                : 'border-transparent text-neutral-500 hover:text-neutral-300'
-            )}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </nav>
+      <div className="px-6 pt-4 pb-2 z-40">
+        <nav className="flex p-1 gap-1 glass-panel rounded-xl no-drag max-w-sm">
+          {['scan', 'results', 'settings'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={twMerge(
+                "flex-1 py-1.5 px-3 rounded-lg text-sm font-medium transition-all duration-200",
+                activeTab === tab
+                  ? "bg-white/10 text-white shadow-sm"
+                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
+              )}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden relative">
-        <div className="absolute inset-0 p-0 overflow-auto">
-          {/* Removed p-6 to allow full width for results, specific components handle padding */}
-
+      <main className="flex-1 overflow-hidden relative mx-6 mb-6 mt-2 rounded-2xl glass-panel border-white/5 shadow-2xl">
+        <div className="absolute inset-0 p-0 overflow-auto scrollbar-hide">
           {activeTab === 'scan' && (
-            <div className="p-6">
+            <div className="h-full flex items-center justify-center">
               <ScanDashboard />
             </div>
           )}
 
-          {activeTab === 'results' && <ResultsDashboard />}
+          {activeTab === 'results' && (
+            <ResultsDashboard />
+          )}
 
           {activeTab === 'settings' && (
             <div className="h-full overflow-auto">
@@ -73,9 +80,9 @@ function App() {
       </main>
 
       {/* Status Bar */}
-      <footer className="px-4 py-1 text-xs text-neutral-600 bg-neutral-900 border-t border-neutral-800 flex justify-between">
+      <footer className="px-6 py-2 text-[10px] text-neutral-500 flex justify-between">
         <span>v1.0.0-alpha</span>
-        <span>Phase 4: Safety & Optimization</span>
+        <span>Made with 💜 by Antigravity</span>
       </footer>
     </div>
   )

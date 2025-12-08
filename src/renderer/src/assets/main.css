@@ -13,4 +13,26 @@
 
 body {
   @apply bg-neutral-900 text-neutral-100 antialiased;
+  /* Deep Space Gradient Background */
+  background: radial-gradient(circle at top left, #2e1065 0%, #000000 60%);
+  min-height: 100vh;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-xl;
+}
+
+.glass-header {
+   @apply bg-neutral-900/50 backdrop-blur-md border-b border-white/5;
+}
+
+/* Animations */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

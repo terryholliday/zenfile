@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState } from 'react'
+import { useRef, useMemo, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Stars, Html } from '@react-three/drei'
 import { useScanStore } from '../store/useScanStore'
@@ -134,9 +134,17 @@ function DuplicateSystem({
 
 // --- Main Galaxy Scene ---
 
-export function ZenGalaxy() {
+interface ZenGalaxyProps {
+  onClusterSelect?: (cluster: DuplicateCluster) => void;
+}
+
+export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
   const { largeFiles, duplicates } = useScanStore()
   const [selectedObject, setSelectedObject] = useState<FileNode | DuplicateCluster | null>(null)
+
+  // Initial load animation
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setTimeout(() => setReady(true), 100) }, []);
 
   // Calculate positions in a spiral
   const largeFilePositions = useMemo(() => {
@@ -214,7 +222,13 @@ export function ZenGalaxy() {
             key={cluster.hash}
             cluster={cluster}
             position={position}
-            onClick={(c) => setSelectedObject(c)}
+            onClick={(c) => {
+              if (onClusterSelect) {
+                onClusterSelect(c);
+              } else {
+                setSelectedObject(c);
+              }
+            }}
           />
         ))}
       </Canvas>

@@ -1,6 +1,18 @@
 import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import { useScanStore } from '../store/useScanStore'
+import { useState, useEffect } from 'react'
+
+const ZEN_QUOTES = [
+  'Order is the sanity of the mind, the health of the body, the peace of the city.',
+  'Simplifying your life is about finding the balance between what you need and what you want.',
+  'Clutter is nothing more than postponed decisions.',
+  'Simplicity is the ultimate sophistication.',
+  'For every minute spent organizing, an hour is earned.',
+  'The objective of cleaning is not just to clean, but to feel happiness living within that environment.',
+  'Clear your space, clear your mind.',
+  'Digital minimalism is about focusing on what truly matters.'
+];
 
 export function ScanDashboard() {
   const {
@@ -14,8 +26,18 @@ export function ScanDashboard() {
     currentFile
   } = useScanStore()
 
+  const [quote, setQuote] = useState(ZEN_QUOTES[0]);
   const isScanning = scanState === 'SCANNING'
   const isIdle = scanState === 'IDLE' || scanState === 'COMPLETED'
+
+  // Rotate quotes during scanning
+  useEffect(() => {
+    if (!isScanning) return;
+    const interval = setInterval(() => {
+      setQuote(ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)]);
+    }, 5000); // Change every 5 seconds
+    return () => clearInterval(interval);
+  }, [isScanning]);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B'
@@ -26,20 +48,39 @@ export function ScanDashboard() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center p-8 space-y-8 min-h-[400px]">
+    <div className="flex flex-col items-center justify-center space-y-8 min-h-[400px] w-full max-w-2xl mx-auto">
       {/* Progress Ring / Status Indicator */}
-      <div className="relative w-64 h-64 flex items-center justify-center">
+      <div className="relative w-72 h-72 flex items-center justify-center">
         {/* Background Ring */}
-        <div className="absolute inset-0 rounded-full border-4 border-neutral-800" />
+        <div className="absolute inset-0 rounded-full border-4 border-white/5" />
 
-        {/* Animated Ring */}
+        {/* Animated Ring (Breathing Effect) */}
         <motion.div
           className={clsx(
-            'absolute inset-0 rounded-full border-4 border-indigo-500',
+            'absolute inset-0 rounded-full border-4 border-indigo-400 blur-sm',
             isScanning ? 'opacity-100' : 'opacity-0'
           )}
-          animate={isScanning ? { rotate: 360 } : { rotate: 0 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          animate={isScanning ? {
+            rotate: 360,
+            scale: [1, 1.05, 1],
+          } : { rotate: 0, scale: 1 }}
+          transition={{
+            rotate: { duration: 8, repeat: Infinity, ease: 'linear' },
+            scale: { duration: 4, repeat: Infinity, ease: 'easeInOut' }
+          }}
+          style={{
+            borderRightColor: 'transparent',
+            borderBottomColor: 'transparent',
+            borderLeftColor: 'transparent'
+          }}
+        />
+        <motion.div
+          className={clsx(
+            'absolute inset-0 rounded-full border-4 border-white',
+            isScanning ? 'opacity-100' : 'opacity-0'
+          )}
+          animate={isScanning ? { rotate: -360 } : { rotate: 0 }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
           style={{
             borderRightColor: 'transparent',
             borderBottomColor: 'transparent'
@@ -47,53 +88,66 @@ export function ScanDashboard() {
         />
 
         {/* Center Content */}
-        <div className="text-center z-10">
+        <div className="text-center z-10 p-8 glass-panel rounded-full w-48 h-48 flex flex-col items-center justify-center backdrop-blur-3xl shadow-2xl border-white/10">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             key={scanState}
             className="flex flex-col items-center"
           >
-            <h3 className="text-4xl font-bold text-white tracking-tighter">
+            <h3 className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">
               {scanState === 'IDLE'
-                ? 'Ready'
+                ? 'READY'
                 : scanState === 'SCANNING'
-                  ? 'Scanning'
+                  ? 'ZEN MDOE'
                   : scanState === 'COMPLETED'
-                    ? 'Done'
+                    ? 'DONE'
                     : scanState}
             </h3>
-            <p className="text-neutral-500 text-sm mt-2">
+            <p className="text-indigo-200 text-xs mt-2 uppercase tracking-widest font-bold">
               {scanState === 'SCANNING'
-                ? `${formatBytes(bytesScanned)} processed`
-                : 'Waiting for command'}
+                ? 'Harmonizing Files'
+                : 'System Idle'}
             </p>
           </motion.div>
         </div>
       </div>
 
+      {/* Zen Quote */}
+      {isScanning && (
+        <motion.div
+          key={quote}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="h-12 text-center max-w-md"
+        >
+          <p className="text-sm text-indigo-200/80 italic font-medium">&quot;{quote}&quot;</p>
+        </motion.div>
+      )}
+
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-        <div className="p-4 bg-neutral-800/50 rounded-lg border border-neutral-700 text-center">
-          <div className="text-sm text-neutral-400">Files Scanned</div>
-          <div className="text-xl font-mono text-indigo-400">{filesScanned.toLocaleString()}</div>
+      <div className="grid grid-cols-2 gap-4 w-full">
+        <div className="p-5 glass-panel rounded-2xl text-center hover:bg-white/10 transition-colors">
+          <div className="text-xs text-neutral-400 uppercase tracking-wider font-bold mb-1">Files Scanned</div>
+          <div className="text-3xl font-mono text-white tracking-tight">{filesScanned.toLocaleString()}</div>
         </div>
-        <div className="p-4 bg-neutral-800/50 rounded-lg border border-neutral-700 text-center">
-          <div className="text-sm text-neutral-400">Data Processed</div>
-          <div className="text-xl font-mono text-emerald-400">{formatBytes(bytesScanned)}</div>
+        <div className="p-5 glass-panel rounded-2xl text-center hover:bg-white/10 transition-colors">
+          <div className="text-xs text-neutral-400 uppercase tracking-wider font-bold mb-1">Data Processed</div>
+          <div className="text-3xl font-mono text-indigo-300 tracking-tight">{formatBytes(bytesScanned)}</div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col items-center gap-4 w-full">
+      <div className="flex flex-col items-center gap-6 w-full">
         {isIdle && (
-          <div className="flex items-center gap-4 w-full max-w-md p-3 rounded-lg bg-neutral-800 border border-neutral-700">
+          <div className="flex items-center gap-4 w-full p-2 pl-4 pr-2 rounded-xl glass-panel group hover:border-white/20 transition-all">
             <div className="flex-1 truncate text-left">
-              <div className="text-xs text-neutral-500 uppercase tracking-wider font-bold mb-1">
+              <div className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold mb-0.5">
                 Target Directory
               </div>
               <div
-                className="text-neutral-200 text-sm truncate font-mono"
+                className="text-neutral-200 text-sm truncate font-mono group-hover:text-white transition-colors"
                 title={settings?.includePaths[0]}
               >
                 {settings?.includePaths[0] || 'No directory selected'}
@@ -104,25 +158,25 @@ export function ScanDashboard() {
                 const path = await window.fileZen.openDirectory()
                 if (path) setIncludePath(path)
               }}
-              className="px-4 py-2 text-sm bg-neutral-700 hover:bg-neutral-600 text-white rounded transition-colors"
+              className="px-4 py-2 text-xs font-bold bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/5 hover:border-white/20 transition-all"
             >
-              Change
+              CHANGE
             </button>
           </div>
         )}
 
-        <div className="flex gap-4">
+        <div className="w-full">
           {isIdle ? (
             <button
               onClick={() => startScan(settings?.includePaths || [])}
-              className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors shadow-lg shadow-indigo-500/20 w-48"
+              className="w-full py-4 bg-white text-black hover:bg-indigo-50 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
             >
-              Start Smart Scan
+              Start Zen Scan
             </button>
           ) : (
             <button
               onClick={() => cancelScan()}
-              className="px-8 py-3 bg-red-900/50 hover:bg-red-900 border border-red-800 text-red-200 rounded-lg font-medium transition-colors w-48"
+              className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/50 text-red-200 rounded-xl font-bold text-lg transition-all active:scale-[0.98]"
               disabled={scanState === 'CANCELLING'}
             >
               {scanState === 'CANCELLING' ? 'Stopping...' : 'Stop Scan'}
@@ -130,18 +184,14 @@ export function ScanDashboard() {
           )}
         </div>
 
-        {/* Live Scan Results */}
+        {/* Live Scan Results (Subtle in Zen Mode) */}
         {isScanning && currentFile && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-xl mt-4 px-4 py-3 bg-neutral-900/50 rounded-md border border-neutral-800"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.5 }}
+            className="w-full text-center"
           >
-            <div className="flex items-center gap-2 text-xs text-neutral-500 mb-1">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="uppercase tracking-wider font-bold">Processing</span>
-            </div>
-            <div className="text-neutral-300 font-mono text-xs truncate" title={currentFile}>
+            <div className="text-neutral-500 font-mono text-[10px] truncate max-w-xs mx-auto" title={currentFile}>
               {currentFile}
             </div>
           </motion.div>
