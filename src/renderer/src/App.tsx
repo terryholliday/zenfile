@@ -4,7 +4,7 @@ import { ScanDashboard } from './components/ScanDashboard'
 import { ResultsDashboard } from './components/ResultsDashboard'
 import { useScanStore } from './store/useScanStore'
 
-function App(): JSX.Element {
+function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
   const scanState = useScanStore(s => s.scanState);
 

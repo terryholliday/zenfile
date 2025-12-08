@@ -4,6 +4,17 @@ import { clsx } from 'clsx';
 import { useScanStore } from '../store/useScanStore';
 
 export function ScanDashboard() {
+    const {
+        scanState,
+        filesScanned,
+        bytesScanned,
+        settings,
+        setIncludePath,
+        startScan,
+        cancelScan
+    } = useScanStore();
+
+    const isScanning = scanState === 'SCANNING';
     const isIdle = scanState === 'IDLE' || scanState === 'COMPLETED';
 
     const formatBytes = (bytes: number) => {
