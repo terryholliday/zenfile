@@ -12,7 +12,7 @@ export enum IpcChannel {
   ActionMove = 'IPC_ACTION_MOVE'
 }
 
-export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED'
+export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED' | 'CANCELLED'
 export type FileTag = 'DUPLICATE' | 'LARGE' | 'STALE' | 'JUNK' | 'EMPTY_FOLDER'
 
 export interface FileNode {

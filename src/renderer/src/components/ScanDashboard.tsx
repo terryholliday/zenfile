@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useScanStore } from '../store/useScanStore'
 import clsx from 'clsx'
@@ -95,7 +95,9 @@ export function ScanDashboard() {
           <fog attach="fog" args={['#050510', 10, 50]} />
           <ambientLight intensity={0.5} />
 
-          <ScanGalaxy fileCount={filesScanned} />
+          <Suspense fallback={null}>
+            <ScanGalaxy fileCount={filesScanned} />
+          </Suspense>
         </Canvas>
         {/* Vignette Overlay for readability */}
         <div className="absolute inset-0 bg-radial-gradient-strong pointer-events-none" />
