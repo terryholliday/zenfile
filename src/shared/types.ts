@@ -1,0 +1,112 @@
+export enum IpcChannel {
+    ScanStart = "IPC_SCAN_START",
+    ScanCancel = "IPC_SCAN_CANCEL",
+    ScanProgress = "IPC_SCAN_PROGRESS",
+    ActionQuarantine = "IPC_ACTION_QUARANTINE",
+    ActionTrash = "IPC_ACTION_TRASH",
+    SettingsGet = "IPC_SETTINGS_GET",
+    SettingsSave = "IPC_SETTINGS_SAVE",
+    DialogOpen = "IPC_DIALOG_OPEN",
+    GetResults = "IPC_GET_RESULTS",
+    GetSuggestions = "IPC_GET_SUGGESTIONS",
+    ActionMove = "IPC_ACTION_MOVE"
+}
+
+export type ScannerState = "IDLE" | "SCANNING" | "PAUSED" | "CANCELLING" | "COMPLETED";
+export type FileTag = "DUPLICATE" | "LARGE" | "STALE" | "JUNK" | "EMPTY_FOLDER";
+
+export interface FileNode {
+    id: string;             // UUID
+    path: string;           // Absolute path
+    name: string;
+    sizeBytes: number;
+    atimeMs: number | null;
+    mtimeMs: number | null;
+    isDirectory: boolean;
+    hash?: string;          // SHA-256
+    tags: FileTag[];
+}
+
+export interface DuplicateCluster {
+    hash: string;
+    files: FileNode[];
+}
+
+export interface Anchor {
+    id: string;             // Folder ID or Path hash
+    path: string;           // Folder Path
+    name: string;           // "AI Projects"
+    score: number;          // Confidence score
+    keywords: string[];     // "transformer", "model", etc.
+}
+
+export interface Match {
+    fileId: string;
+    confidence: number;
+    reason: string;         // "Filename matches anchor keywords"
+}
+
+export interface Suggestion {
+    id: string;
+    type: "CONSOLIDATE" | "ORGANIZE";
+    anchor: Anchor;
+    files: FileNode[];      // Orphans
+    confidence: number;
+}
+
+export interface SettingsSchema {
+    schemaVersion: number;
+    maxFileMb: number;
+    staleYears: number;
+    includePaths: string[];
+    excludePaths: string[];
+    dryRun: boolean;
+    isDarkTheme: boolean;
+}
+
+export interface ScanSession {
+    id: string;
+    startedAt: string;
+    state: ScannerState;
+    duplicates: DuplicateCluster[];
+    largeFiles: FileNode[];
+    staleFiles: FileNode[];
+    junkFiles: FileNode[];
+    emptyFolders: FileNode[];
+}
+
+// IPC Payloads
+export interface ScanStartPayload {
+    sessionId: string;
+    paths: string[];
+    settings: SettingsSchema;
+}
+
+export interface ScanProgressPayload {
+    sessionId: string;
+    state: ScannerState;
+    filesScanned: number;
+    bytesScanned: number;
+    currentFile?: string;
+}
+
+export interface ActionPayload {
+    sessionId: string;
+    fileIds: string[];
+    dryRun: boolean;
+}
+
+// Preload API Contract
+export interface FileZenApi {
+    startScan(payload: ScanStartPayload): void;
+    cancelScan(payload: { sessionId: string }): void;
+    onScanProgress(handler: (payload: ScanProgressPayload) => void): () => void;
+    moveToQuarantine(payload: ActionPayload): Promise<{ success: string[]; failures: string[] }>;
+    sendToTrash(payload: ActionPayload): Promise<{ success: string[]; failures: string[] }>;
+    getSettings(): Promise<SettingsSchema>;
+    saveSettings(settings: SettingsSchema): Promise<void>;
+    openDirectory(): Promise<string | null>;
+    getResults(sessionId: string): Promise<ScanSession | null>;
+    getSuggestions(sessionId: string): Promise<Suggestion[]>;
+    moveFiles(payload: ActionPayload & { destination: string }): Promise<{ success: string[]; failures: string[] }>;
+}
