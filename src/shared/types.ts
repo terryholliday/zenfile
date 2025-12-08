@@ -15,7 +15,26 @@ export enum IpcChannel {
 }
 
 export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED' | 'CANCELLED'
-export type FileTag = 'DUPLICATE' | 'LARGE' | 'STALE' | 'JUNK' | 'EMPTY_FOLDER' | 'INVOICE' | 'CONTRACT' | 'RECEIPT' | 'FINANCIAL' | 'LEGAL' | 'PERSONAL' | 'SCREENSHOT' | 'SENSITIVE'
+export type FileTag =
+  | 'DUPLICATE'
+  | 'LARGE'
+  | 'STALE'
+  | 'JUNK'
+  | 'EMPTY_FOLDER'
+  | 'INVOICE'
+  | 'CONTRACT'
+  | 'RECEIPT'
+  | 'FINANCIAL'
+  | 'LEGAL'
+  | 'PERSONAL'
+  | 'SCREENSHOT'
+  | 'SENSITIVE'
+
+export interface AiSearchHit {
+  id: string
+  path: string
+  score: number
+}
 
 export interface FileNode {
   id: string // UUID
@@ -119,7 +138,7 @@ export interface FileZenApi {
   moveFiles(
     payload: ActionPayload & { destination: string }
   ): Promise<{ success: string[]; failures: string[] }>
-  aiSearch(query: string): Promise<any[]>
+  aiSearch(query: string): Promise<AiSearchHit[]>
   redactText(text: string): Promise<string>
 }
 

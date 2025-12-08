@@ -1,18 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { clsx } from 'clsx'
-import { FileNode } from '../../../shared/types'
-
-interface SearchResult {
-    id: string
-    path: string
-    score: number
-}
+import { AiSearchHit } from '../../../shared/types'
 
 export function ChatDashboard() {
     const [query, setQuery] = useState('')
     const [isSearching, setIsSearching] = useState(false)
-    const [results, setResults] = useState<SearchResult[]>([])
+    const [results, setResults] = useState<AiSearchHit[]>([])
     const [hasSearched, setHasSearched] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
