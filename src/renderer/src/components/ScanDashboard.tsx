@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import { useScanStore } from '../store/useScanStore';
