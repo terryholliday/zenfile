@@ -62,8 +62,20 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
     },
 
     startScan: async (paths: string[]) => {
-        const { settings } = get();
-        if (!settings) return;
+        let { settings } = get();
+        if (!settings) {
+             // Fallback if not initialized
+             settings = {
+                schemaVersion: 1,
+                maxFileMb: 50,
+                staleYears: 1,
+                includePaths: paths,
+                excludePaths: [],
+                dryRun: true,
+                isDarkTheme: true
+            };
+            set({ settings });
+        }
 
         const sessionId = uuidv4();
         set({
@@ -110,8 +122,17 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
 
     setIncludePath: (path: string) => {
         const { settings } = get();
-        if (!settings) return;
-        const newSettings = { ...settings, includePaths: [path] };
+        // If settings are null, assume defaults/empty but preserve the new path
+        const current = settings || {
+            schemaVersion: 1,
+            maxFileMb: 50,
+            staleYears: 1,
+            includePaths: [],
+            excludePaths: [],
+            dryRun: true,
+            isDarkTheme: true
+        };
+        const newSettings = { ...current, includePaths: [path] };
         set({ settings: newSettings });
         window.fileZen.saveSettings(newSettings);
     },

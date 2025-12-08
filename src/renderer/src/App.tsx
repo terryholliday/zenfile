@@ -7,6 +7,11 @@ import { useScanStore } from './store/useScanStore'
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
   const scanState = useScanStore(s => s.scanState);
+  const initialize = useScanStore(s => s.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, []);
 
   // Auto-switch to results when done
   useEffect(() => {
