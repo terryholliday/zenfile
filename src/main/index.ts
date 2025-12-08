@@ -2,10 +2,10 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { logger } from './logger';
-import { settingsStore } from './store';
-import { scanService } from './scan-service';
-import { IpcChannel, SettingsSchema } from '../shared/types';
+import { logger } from './logger'
+import { settingsStore } from './store'
+import { scanService } from './scan-service'
+import { IpcChannel, SettingsSchema } from '../shared/types'
 
 function createWindow(): void {
   // Create the browser window.
@@ -55,32 +55,32 @@ app.whenReady().then(() => {
 
   // Initialize Store
   settingsStore.load().then(() => {
-    logger.info('Settings loaded');
-  });
+    logger.info('Settings loaded')
+  })
 
   // IPC Handlers
   ipcMain.handle(IpcChannel.SettingsGet, async () => {
-    return settingsStore.get();
-  });
+    return settingsStore.get()
+  })
 
   ipcMain.handle(IpcChannel.SettingsSave, async (_, settings: SettingsSchema) => {
-    await settingsStore.save(settings);
-  });
+    await settingsStore.save(settings)
+  })
 
   ipcMain.handle(IpcChannel.DialogOpen, async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
-    });
-    return result.canceled ? null : result.filePaths[0];
-  });
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
 
   // Future IPC handlers stubbed
-  ipcMain.on(IpcChannel.ScanStart, (_, payload) => scanService.start(payload));
-  ipcMain.on(IpcChannel.ScanCancel, () => scanService.cancel());
+  ipcMain.on(IpcChannel.ScanStart, (_, payload) => scanService.start(payload))
+  ipcMain.on(IpcChannel.ScanCancel, () => scanService.cancel())
 
-  ipcMain.handle(IpcChannel.ActionTrash, (_, payload) => scanService.moveToTrash(payload));
-  ipcMain.handle(IpcChannel.ActionQuarantine, (_, payload) => scanService.quarantine(payload));
-  ipcMain.handle(IpcChannel.GetResults, (_, sessionId) => scanService.getResults(sessionId));
+  ipcMain.handle(IpcChannel.ActionTrash, (_, payload) => scanService.moveToTrash(payload))
+  ipcMain.handle(IpcChannel.ActionQuarantine, (_, payload) => scanService.quarantine(payload))
+  ipcMain.handle(IpcChannel.GetResults, (_, sessionId) => scanService.getResults(sessionId))
 
   createWindow()
 

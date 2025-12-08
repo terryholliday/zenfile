@@ -7,19 +7,19 @@ import { useScanStore } from './store/useScanStore'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
-  const scanState = useScanStore(s => s.scanState);
-  const initialize = useScanStore(s => s.initialize);
+  const scanState = useScanStore((s) => s.scanState)
+  const initialize = useScanStore((s) => s.initialize)
 
   useEffect(() => {
-    initialize();
-  }, []);
+    initialize()
+  }, [])
 
   // Auto-switch to results when done
   useEffect(() => {
     if (scanState === 'COMPLETED') {
-      setActiveTab('results');
+      setActiveTab('results')
     }
-  }, [scanState]);
+  }, [scanState])
 
   return (
     <div className="flex flex-col h-screen bg-neutral-900 text-neutral-100 font-sans select-none overflow-hidden">
@@ -27,7 +27,9 @@ function App() {
       <header className="flex items-center justify-between px-4 py-3 bg-neutral-800 border-b border-neutral-700 drag-region">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full bg-indigo-500" />
-          <h1 className="text-sm font-semibold tracking-wide uppercase text-neutral-400">FileZen</h1>
+          <h1 className="text-sm font-semibold tracking-wide uppercase text-neutral-400">
+            FileZen
+          </h1>
         </div>
       </header>
 
@@ -38,10 +40,10 @@ function App() {
             key={tab}
             onClick={() => setActiveTab(tab as any)}
             className={twMerge(
-              "pb-2 text-sm font-medium transition-colors border-b-2",
+              'pb-2 text-sm font-medium transition-colors border-b-2',
               activeTab === tab
-                ? "border-indigo-500 text-white"
-                : "border-transparent text-neutral-500 hover:text-neutral-300"
+                ? 'border-indigo-500 text-white'
+                : 'border-transparent text-neutral-500 hover:text-neutral-300'
             )}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -60,9 +62,7 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'results' && (
-            <ResultsDashboard />
-          )}
+          {activeTab === 'results' && <ResultsDashboard />}
 
           {activeTab === 'settings' && (
             <div className="h-full overflow-auto">

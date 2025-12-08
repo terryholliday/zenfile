@@ -1,14 +1,14 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import { IpcChannel, FileZenApi, ScanProgressPayload } from "../shared/types";
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { IpcChannel, FileZenApi, ScanProgressPayload } from '../shared/types'
 
 const api: FileZenApi = {
   startScan: (payload) => ipcRenderer.send(IpcChannel.ScanStart, payload),
   cancelScan: (payload) => ipcRenderer.send(IpcChannel.ScanCancel, payload),
 
   onScanProgress: (handler) => {
-    const subscription = (_: IpcRendererEvent, data: ScanProgressPayload) => handler(data);
-    ipcRenderer.on(IpcChannel.ScanProgress, subscription);
-    return () => ipcRenderer.removeListener(IpcChannel.ScanProgress, subscription);
+    const subscription = (_: IpcRendererEvent, data: ScanProgressPayload) => handler(data)
+    ipcRenderer.on(IpcChannel.ScanProgress, subscription)
+    return () => ipcRenderer.removeListener(IpcChannel.ScanProgress, subscription)
   },
 
   moveToQuarantine: (payload) => ipcRenderer.invoke(IpcChannel.ActionQuarantine, payload),
@@ -19,7 +19,7 @@ const api: FileZenApi = {
   openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpen),
   getResults: (sessionId) => ipcRenderer.invoke(IpcChannel.GetResults, sessionId),
   getSuggestions: (sessionId) => ipcRenderer.invoke(IpcChannel.GetSuggestions, sessionId),
-  moveFiles: (payload) => ipcRenderer.invoke(IpcChannel.ActionMove, payload),
-};
+  moveFiles: (payload) => ipcRenderer.invoke(IpcChannel.ActionMove, payload)
+}
 
-contextBridge.exposeInMainWorld("fileZen", api);
+contextBridge.exposeInMainWorld('fileZen', api)
