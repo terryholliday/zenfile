@@ -11,8 +11,11 @@ export function ScanDashboard() {
     setIncludePath,
     startScan,
     cancelScan,
-    currentFile
+    currentFile,
+    recentFiles
   } = useScanStore()
+
+  const currentFileName = currentFile?.split(/[/\\]/).pop()
 
   const isScanning = scanState === 'SCANNING'
   const isIdle = scanState === 'IDLE' || scanState === 'COMPLETED'
@@ -141,10 +144,36 @@ export function ScanDashboard() {
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="uppercase tracking-wider font-bold">Processing</span>
             </div>
-            <div className="text-neutral-300 font-mono text-xs truncate" title={currentFile}>
+            <div className="text-neutral-100 font-semibold break-all">{currentFileName}</div>
+            <div className="text-neutral-400 font-mono text-xs break-all" title={currentFile}>
               {currentFile}
             </div>
           </motion.div>
+        )}
+
+        {isScanning && recentFiles.length > 0 && (
+          <div className="w-full max-w-xl mt-2 p-4 bg-neutral-900/30 rounded-md border border-neutral-800">
+            <div className="flex items-center justify-between text-xs text-neutral-500 mb-2">
+              <span className="uppercase tracking-wider font-bold">Recently queued</span>
+              <span>{Math.min(recentFiles.length, 50)} files</span>
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+              {recentFiles.map((file, idx) => (
+                <div
+                  key={`${file}-${idx}`}
+                  className="flex items-start gap-2 text-xs text-neutral-300"
+                >
+                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-neutral-100 break-all">
+                      {file.split(/[/\\]/).pop()}
+                    </span>
+                    <span className="text-neutral-500 break-all font-mono">{file}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -15,6 +15,7 @@ interface ScanStoreState {
   filesScanned: number
   bytesScanned: number
   currentFile?: string
+  recentFiles: string[]
 
   // Results
   duplicates: DuplicateCluster[]
@@ -42,6 +43,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
   filesScanned: 0,
   bytesScanned: 0,
   currentFile: '',
+  recentFiles: [],
   settings: null,
 
   duplicates: [],
@@ -83,6 +85,8 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       scanState: 'SCANNING',
       filesScanned: 0,
       bytesScanned: 0,
+      currentFile: undefined,
+      recentFiles: [],
       duplicates: [],
       largeFiles: []
     })
@@ -116,11 +120,21 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       setTimeout(() => loadResults(), 500)
     }
 
-    set({
-      scanState: payload.state,
-      filesScanned: payload.filesScanned,
-      bytesScanned: payload.bytesScanned,
-      currentFile: payload.currentFile
+    set((state) => {
+      let recentFiles = state.recentFiles
+
+      if (payload.currentFile && payload.currentFile !== state.currentFile) {
+        const updated = [payload.currentFile, ...state.recentFiles]
+        recentFiles = updated.slice(0, 50)
+      }
+
+      return {
+        scanState: payload.state,
+        filesScanned: payload.filesScanned,
+        bytesScanned: payload.bytesScanned,
+        currentFile: payload.currentFile,
+        recentFiles
+      }
     })
   },
 
