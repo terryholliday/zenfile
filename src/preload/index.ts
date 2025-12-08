@@ -18,6 +18,8 @@ const api: FileZenApi = {
   saveSettings: (settings) => ipcRenderer.invoke(IpcChannel.SettingsSave, settings),
   openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpen),
   getResults: (sessionId) => ipcRenderer.invoke(IpcChannel.GetResults, sessionId),
+  getSuggestions: (sessionId) => ipcRenderer.invoke(IpcChannel.GetSuggestions, sessionId),
+  moveFiles: (payload) => ipcRenderer.invoke(IpcChannel.ActionMove, payload),
 };
 
 contextBridge.exposeInMainWorld("fileZen", api);

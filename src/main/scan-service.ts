@@ -1,8 +1,8 @@
 import { Worker } from 'worker_threads';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid'; // Unused
 import {
     ScannerState,
     ScanSession,
@@ -20,7 +20,7 @@ import {
     ScanResultResponse,
     HashResultResponse
 } from '../shared/worker-types';
-import { WORKER_POOL_SIZE, MAX_IN_MEMORY_QUEUE } from '../shared/constants';
+import { WORKER_POOL_SIZE } from '../shared/constants';
 import { logger } from './logger';
 
 export class ScanService {
@@ -153,7 +153,7 @@ export class ScanService {
                 this.finalizeScan();
             } else {
                 this.terminateWorkers();
-                if (this.session.state !== "COMPLETED") this.updateState("COMPLETED", true);
+                this.updateState("COMPLETED", true);
             }
             return;
         }
