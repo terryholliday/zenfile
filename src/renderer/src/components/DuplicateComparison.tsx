@@ -10,7 +10,7 @@ interface DuplicateComparisonProps {
 export function DuplicateComparison({ cluster, onKeep, onClose }: DuplicateComparisonProps) {
     // Simple heuristic for "AI" recommendation
     // Higher score = better to keep
-    const getScore = (file: FileNode, allFiles: FileNode[]) => {
+    const getScore = (file: FileNode) => {
         let score = 0;
         const path = file.path.toLowerCase();
 
@@ -32,7 +32,7 @@ export function DuplicateComparison({ cluster, onKeep, onClose }: DuplicateCompa
     };
 
     const recommendFileId = cluster.files.reduce((best, current) => {
-        return getScore(current, cluster.files) > getScore(best, cluster.files) ? current : best;
+        return getScore(current) > getScore(best) ? current : best;
     }, cluster.files[0]).id;
 
     return (
