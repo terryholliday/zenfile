@@ -92,8 +92,14 @@ export function ScanDashboard() {
                         </div>
                         <button
                             onClick={async () => {
-                                const path = await window.fileZen.openDirectory();
-                                if (path) setIncludePath(path);
+                                console.log('Clicked Change Directory');
+                                try {
+                                    const path = await window.fileZen.openDirectory();
+                                    console.log('Got path:', path);
+                                    if (path) setIncludePath(path);
+                                } catch (e) {
+                                    console.error('Failed to open directory:', e);
+                                }
                             }}
                             className="px-4 py-2 text-sm bg-neutral-700 hover:bg-neutral-600 text-white rounded transition-colors"
                         >

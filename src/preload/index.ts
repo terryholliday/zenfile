@@ -16,7 +16,10 @@ const api: FileZenApi = {
 
   getSettings: () => ipcRenderer.invoke(IpcChannel.SettingsGet),
   saveSettings: (settings) => ipcRenderer.invoke(IpcChannel.SettingsSave, settings),
-  openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpen),
+  openDirectory: () => {
+    console.log('Preload: Invoking openDirectory');
+    return ipcRenderer.invoke(IpcChannel.DialogOpen);
+  },
   getResults: (sessionId) => ipcRenderer.invoke(IpcChannel.GetResults, sessionId),
   getSuggestions: (sessionId) => ipcRenderer.invoke(IpcChannel.GetSuggestions, sessionId),
   moveFiles: (payload) => ipcRenderer.invoke(IpcChannel.ActionMove, payload),
