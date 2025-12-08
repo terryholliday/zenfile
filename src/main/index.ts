@@ -82,6 +82,10 @@ app.whenReady().then(() => {
   ipcMain.handle(IpcChannel.ActionQuarantine, (_, payload) => scanService.quarantine(payload))
   ipcMain.handle(IpcChannel.ActionMove, (_, payload) => scanService.moveFiles(payload))
   ipcMain.handle(IpcChannel.GetResults, (_, sessionId) => scanService.getResults(sessionId))
+  ipcMain.handle(IpcChannel.AiSearch, async (_, query) => {
+      // Lazy load AI service on first search if not already ready
+      return await import('./ai-service').then(m => m.aiService.search(query))
+  })
 
   createWindow()
 

@@ -31,6 +31,15 @@ const ResultRow = memo(
       <div className="flex-1 truncate">
         <div className="text-neutral-200 truncate font-medium group-hover:text-white transition-colors">{file.name}</div>
         <div className="text-neutral-500 text-xs truncate font-mono opacity-70">{file.path}</div>
+        {file.tags && file.tags.length > 0 && (
+          <div className="flex gap-1 mt-1">
+            {file.tags.map(tag => (
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-medium tracking-wide">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="w-24 text-right text-indigo-300 font-mono text-xs">

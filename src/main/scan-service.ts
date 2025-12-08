@@ -22,6 +22,8 @@ import {
 } from '../shared/worker-types'
 import { WORKER_POOL_SIZE } from '../shared/constants'
 import { logger } from './logger'
+import { tagEngine } from './tag-engine'
+import { aiService } from './ai-service'
 
 export class ScanService {
   private workers: Worker[] = []
@@ -86,7 +88,34 @@ export class ScanService {
     // ... (rest of processQueue)
   }
 
-  // ...
+
+  private handleWorkerMessage(index: number, msg: WorkerResponse) {
+    switch (msg.type) {
+      case WorkerMessageType.RES_READY:
+        this.workerReadyState[index] = true
+        break
+      case WorkerMessageType.RES_SCAN_RESULT:
+        this.activeWorkers--
+        this.handleScanResult(msg)
+        this.processQueue()
+        break
+      case WorkerMessageType.RES_HASH_RESULT:
+        this.activeWorkers--
+        this.handleHashResult(msg)
+        this.processQueue()
+        break
+      case WorkerMessageType.RES_OCR_RESULT:
+        this.activeWorkers--
+        this.handleOcrResult(msg)
+        this.processQueue()
+        break
+      case WorkerMessageType.RES_ERROR:
+        this.activeWorkers--
+        logger.warn(`Worker Error: ${msg.error} at ${msg.path}`)
+        this.processQueue()
+        break
+    }
+  }
 
   private handleScanResult(res: ScanResultResponse) {
     if (!this.session) return
@@ -98,6 +127,13 @@ export class ScanService {
       if (f.sizeBytes > 100 * 1024 * 1024) {
         this.session?.largeFiles.push(f)
       }
+      
+      // Auto-Tagging (Filename based)
+      f.tags = tagEngine.analyze(f)
+      
+      // Index for AI Search
+      // We purposefully don't await this to avoid blocking the scan loop
+      aiService.indexFile(f).catch(err => logger.error('Index failed', err))
       
       // OCR Queue Logic
       if (this.currentSettings?.enableOcr) {
@@ -120,6 +156,26 @@ export class ScanService {
       }
     }
     this.processedHashes++
+    this.updateState('SCANNING')
+  }
+
+  private handleOcrResult(res: any) {
+    if (!this.session) return
+    for (const file of this.resultFiles.values()) {
+        if (file.path === res.filePath) {
+            file.metadata = { ...file.metadata, text: res.text }
+            // Re-analyze tags with new text content
+            const newTags = tagEngine.analyze(file)
+            // Merge tags avoiding duplicates
+            const merged = new Set([...file.tags, ...newTags])
+            file.tags = Array.from(merged)
+
+            // Re-index with new content
+            aiService.indexFile(file).catch(err => logger.error('Re-index failed', err))
+            break
+        }
+    }
+    this.processedOcrDocs++
     this.updateState('SCANNING')
   }
 
