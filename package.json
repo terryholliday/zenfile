@@ -28,6 +28,7 @@
     "@types/three": "0.160.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.25",
+    "lucide-react": "^0.469.0",
     "natural": "^8.1.0",
     "react-virtuoso": "^4.17.0",
     "tailwind-merge": "^3.4.0",
