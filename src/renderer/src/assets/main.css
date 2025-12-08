@@ -9,6 +9,9 @@
 
 :root {
   color-scheme: dark;
+  --zen-clarity: 0.5;
+  --zen-noise-opacity: 0.5;
+  --zen-spacing: 1rem;
 }
 
 body {
@@ -24,13 +27,20 @@ body {
 }
 
 .glass-header {
-   @apply bg-neutral-900/50 backdrop-blur-md border-b border-white/5;
+  @apply bg-neutral-900/50 backdrop-blur-md border-b border-white/5;
 }
 
 /* Animations */
 @keyframes pulse-slow {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.8; }
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .animate-pulse-slow {

@@ -5,6 +5,7 @@ import { ResultsDashboard } from './components/ResultsDashboard'
 import { OrganizeDashboard } from './components/OrganizeDashboard'
 import { SettingsDashboard } from './components/SettingsDashboard'
 import { ChatDashboard } from './components/ChatDashboard'
+import { ClaritySlider } from './components/ClaritySlider'
 import { useScanStore } from './store/useScanStore'
 
 function App() {
@@ -34,9 +35,14 @@ function App() {
           <h1 className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">FileZen</h1>
         </div>
 
-        {/* Status Indicator */}
-        <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-xs font-medium text-neutral-400">
-          {scanState === 'IDLE' ? 'Ready' : scanState}
+        <div className="flex items-center gap-4">
+          <div className="no-drag">
+            <ClaritySlider />
+          </div>
+          {/* Status Indicator */}
+          <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-xs font-medium text-neutral-400">
+            {scanState === 'IDLE' ? 'Ready' : scanState}
+          </div>
         </div>
       </header>
 

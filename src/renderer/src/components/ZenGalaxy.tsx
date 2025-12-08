@@ -4,6 +4,7 @@ import { OrbitControls, Stars, Html, Sparkles, Float } from '@react-three/drei'
 import { useScanStore } from '../store/useScanStore'
 import { FileNode, DuplicateCluster } from '../../../shared/types'
 import * as THREE from 'three'
+import { TidalWave } from './3d/TidalWave'
 
 // --- Visual Components ---
 
@@ -196,6 +197,7 @@ export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
 
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
       <Sparkles count={500} scale={50} size={2} speed={0.4} opacity={0.5} noise={0.2} color="#ffffff" />
+      <TidalWave />
 
       {/* Content */}
       {ready && (
