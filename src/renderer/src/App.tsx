@@ -4,6 +4,7 @@ import { ScanDashboard } from './components/ScanDashboard'
 import { ResultsDashboard } from './components/ResultsDashboard'
 import { SettingsDashboard } from './components/SettingsDashboard'
 import { useScanStore } from './store/useScanStore'
+import { AIConcierge } from './components/AIConcierge'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'settings'>('scan')
@@ -70,6 +71,8 @@ function App() {
             </div>
           )}
         </div>
+
+        <AIConcierge />
       </main>
 
       {/* Status Bar */}
