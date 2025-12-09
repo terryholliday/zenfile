@@ -91,7 +91,46 @@ export class ScanService {
       return
     }
 
-    // ... (rest of processQueue)
+    // Dispatch Work to Idle Workers
+    for (let i = 0; i < this.workers.length; i++) {
+      if (!this.workerReadyState[i]) continue
+
+      // 1. Directory Scanning
+      if (this.dirQueue.length > 0) {
+        const dir = this.dirQueue.shift()
+        if (dir) {
+          this.workerReadyState[i] = false
+          this.activeWorkers++
+          const cmd: WorkerCommand = { type: WorkerMessageType.CMD_SCAN_DIR, path: dir }
+          this.workers[i].postMessage(cmd)
+          continue
+        }
+      }
+
+      // 2. Hashing
+      if (this.hashQueue.length > 0) {
+        const file = this.hashQueue.shift()
+        if (file) {
+          this.workerReadyState[i] = false
+          this.activeWorkers++
+          const cmd: WorkerCommand = { type: WorkerMessageType.CMD_HASH_FILE, filePath: file }
+          this.workers[i].postMessage(cmd)
+          continue
+        }
+      }
+
+      // 3. OCR
+      if (this.ocrQueue.length > 0) {
+        const file = this.ocrQueue.shift()
+        if (file) {
+          this.workerReadyState[i] = false
+          this.activeWorkers++
+          const cmd: WorkerCommand = { type: WorkerMessageType.CMD_OCR_FILE, filePath: file }
+          this.workers[i].postMessage(cmd)
+          continue
+        }
+      }
+    }
   }
 
 
