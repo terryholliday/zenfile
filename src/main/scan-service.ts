@@ -46,6 +46,7 @@ export class ScanService {
   // In-Memory Results
   private resultFiles: Map<string, FileNode> = new Map()
   private currentSettings: any = null // SettingsSchema
+  private lastScannedFile = ''
 
   constructor() {}
 
@@ -172,7 +173,7 @@ export class ScanService {
               state: this.session.state,
               filesScanned: this.processedFiles,
               bytesScanned: this.processedBytes,
-              currentFile: this.resultFiles.size > 0 ? Array.from(this.resultFiles.values())[this.resultFiles.size - 1].path : '',
+              currentFile: this.lastScannedFile,
               progress: 0 // TODO calc progress
           }
           
@@ -270,13 +271,41 @@ export class ScanService {
     }
   }
 
+  private shouldIgnore(filePath: string): boolean {
+      const excludes = this.currentSettings?.excludePaths || []
+       // Always include defaults if not present
+       // (Naive check, ideally merge sets)
+       const defaults = ['node_modules', '.git', 'AppData', 'Library', '/System', 'C:\\Windows', 'Temp', 'tmp']
+       
+       const basename = path.basename(filePath)
+       
+       // Check against exact name matches
+       if (defaults.includes(basename) || excludes.includes(basename)) return true
+       
+       // Check if path contains any ignored segment
+       // This is expensive but necessary for top-level recursive ignores
+       // We'll optimize by just checking if the *current* dir/file is the ignored one, 
+       // since we filter dirs before recursing.
+       
+       return false
+  }
+
   private handleScanResult(res: ScanResultResponse) {
     if (!this.session) return
-    this.dirQueue.push(...res.dirs)
+
+    // Filter Directories
+    const validDirs = res.dirs.filter(d => !this.shouldIgnore(d))
+    this.dirQueue.push(...validDirs)
+
+    // Filter Files
     res.files.forEach((f) => {
+      if (this.shouldIgnore(f.path)) return
+
       this.resultFiles.set(f.id, f)
       this.processedFiles++
       this.processedBytes += f.sizeBytes
+      this.lastScannedFile = f.path // Efficiently track last file
+
       if (f.sizeBytes > 100 * 1024 * 1024) {
         this.session?.largeFiles.push(f)
       }
@@ -284,13 +313,23 @@ export class ScanService {
       // Auto-Tagging (Filename based)
       f.tags = tagEngine.analyze(f)
       
-      // Index for AI Search
-      // We purposefully don't await this to avoid blocking the scan loop
-      aiService.indexFile(f).catch(err => logger.error('Index failed', err))
+      // Index for AI Search - WHITELIST ONLY
+      const ext = path.extname(f.name).toLowerCase()
+      const allowedIndexExtensions = [
+          '.txt', '.md', '.markdown', 
+          '.pdf', '.docx', '.doc', '.rtf',
+          '.ts', '.tsx', '.js', '.jsx', '.json',
+          '.py', '.java', '.c', '.cpp', '.h', '.cs', 
+          '.go', '.rs', '.php', '.rb',
+          '.html', '.css', '.scss'
+      ]
+      
+      if (allowedIndexExtensions.includes(ext)) {
+          aiService.indexFile(f).catch(err => logger.error('Index failed', err))
+      }
       
       // OCR Queue Logic
       if (this.currentSettings?.enableOcr) {
-          const ext = path.extname(f.name).toLowerCase()
           if (['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp'].includes(ext)) {
               this.ocrQueue.push(f.path)
           }
