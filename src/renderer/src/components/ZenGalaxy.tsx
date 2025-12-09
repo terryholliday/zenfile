@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Stars, Html, Sparkles, Float } from '@react-three/drei'
+import { OrbitControls, Stars, Html, Sparkles, Float, Billboard } from '@react-three/drei'
 import { useScanStore } from '../store/useScanStore'
 import { FileNode, DuplicateCluster } from '../../../shared/types'
 import * as THREE from 'three'
@@ -197,7 +197,11 @@ export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
 
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
       <Sparkles count={500} scale={50} size={2} speed={0.4} opacity={0.5} noise={0.2} color="#ffffff" />
-      <TidalWave isActive={scanState === 'SCANNING'} speed={0.2} />
+
+      {/* Wave always faces camera to look like it surrounds the UI */}
+      <Billboard>
+        <TidalWave isActive={scanState === 'SCANNING'} speed={0.2} />
+      </Billboard>
 
       {/* Content */}
       {ready && (

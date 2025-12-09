@@ -62,7 +62,7 @@ declare global {
     }
 }
 
-export function TidalWave({ isActive = false, speed = 0.5 }: { isActive?: boolean; speed?: number }) {
+export function TidalWave({ isActive = false, speed = 0.5, ...props }: { isActive?: boolean; speed?: number } & JSX.IntrinsicElements['mesh']) {
     const materialRef = useRef<any>()
 
     useFrame((state, delta) => {
@@ -80,7 +80,7 @@ export function TidalWave({ isActive = false, speed = 0.5 }: { isActive?: boolea
     })
 
     return (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]}>
+        <mesh {...props}>
             <planeGeometry args={[100, 100, 128, 128]} />
             {/* @ts-ignore */}
             <waveMaterial
