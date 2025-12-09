@@ -143,7 +143,7 @@ export class ScanService {
   private currentSettings: ScanSettings | null = null
   private lastScannedFile = ''
 
-  constructor() {}
+
 
   // -----------------
   // Public API
@@ -661,8 +661,9 @@ export class ScanService {
         await shell.trashItem(file.path)
         this.resultFiles.delete(id)
         success.push(id)
-      } catch (err: any) {
-        logger.error(`Failed to trash ${file.path}`, { error: err?.message })
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        logger.error(`Failed to trash ${file.path}`, { error: errorMsg })
         failures.push(id)
       }
     }
@@ -701,8 +702,9 @@ export class ScanService {
         await fs.rename(file.path, dest)
         this.resultFiles.delete(id)
         success.push(id)
-      } catch (err: any) {
-        logger.error(`Failed to quarantine ${file.path}`, { error: err?.message })
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        logger.error(`Failed to quarantine ${file.path}`, { error: errorMsg })
         failures.push(id)
       }
     }
@@ -710,9 +712,7 @@ export class ScanService {
     return { success, failures }
   }
 
-  async moveFiles(
-    payload: ActionPayload & { destination: string }
-  ): Promise<ActionResult> {
+  async moveFiles(payload: ActionPayload & { destination: string }): Promise<ActionResult> {
     const success: string[] = []
     const failures: string[] = []
 
@@ -753,8 +753,9 @@ export class ScanService {
         await fs.rename(file.path, destPath)
         this.resultFiles.delete(id)
         success.push(id)
-      } catch (err: any) {
-        logger.error(`Failed to move ${file.path}`, { error: err?.message })
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        logger.error(`Failed to move ${file.path}`, { error: errorMsg })
         failures.push(id)
       }
     }
