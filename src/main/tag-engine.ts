@@ -36,9 +36,7 @@ export class TagEngine {
     }
   ]
 
-import { privacyService } from './privacy-service'
 
-// ... existing code ...
 
   analyze(file: FileNode): FileTag[] {
     const tags: Set<FileTag> = new Set()

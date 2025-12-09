@@ -179,7 +179,7 @@ export class ScanService {
     this.updateState('SCANNING')
   }
 
-  private finalizeScan() {
+  private async finalizeScan() {
     // If we haven't hashed yet, try to find candidates
     if (this.processedHashes === 0 && this.resultFiles.size > 0) {
       logger.info('Scan Phase 1 Complete. Identifying Candidates for Hashing...')
@@ -192,7 +192,7 @@ export class ScanService {
       }
     }
 
-    this.buildDuplicateClusters()
+    await this.buildDuplicateClusters()
     logger.info('Scan Complete.')
     this.updateState('COMPLETED', true)
     this.terminateWorkers()
@@ -216,7 +216,7 @@ export class ScanService {
     return candidates
   }
 
-  private buildDuplicateClusters() {
+  private async buildDuplicateClusters() {
     if (!this.session) return
     const clusters: DuplicateCluster[] = []
     const hashMap = new Map<string, FileNode[]>()
