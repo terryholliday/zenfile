@@ -19,6 +19,26 @@ if (!parentPort) {
   throw new Error('Worker must be spawned with parentPort')
 }
 
+// Global error handlers to prevent silent crashes
+process.on('uncaughtException', (err) => {
+  const errorMsg = err instanceof Error ? err.message : String(err)
+  parentPort?.postMessage({
+    type: WorkerMessageType.RES_ERROR,
+    error: `Uncaught Exception: ${errorMsg}`,
+    fatal: true
+  } as WorkerResponse)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (reason) => {
+  parentPort?.postMessage({
+    type: WorkerMessageType.RES_ERROR,
+    error: `Unhandled Rejection: ${reason}`,
+    fatal: true
+  } as WorkerResponse)
+  process.exit(1)
+})
+
 // OCR Worker instance (lazy loaded)
 let ocrWorker: TesseractWorker | null = null
 
@@ -62,7 +82,7 @@ parentPort.on('message', async (command: WorkerCommand) => {
   }
 })
 
-async function handleOcrFile(filePath: string) {
+async function handleOcrFile(filePath: string): Promise<void> {
   try {
     const worker = await getOcrWorker()
 
@@ -72,7 +92,7 @@ async function handleOcrFile(filePath: string) {
       setTimeout(() => reject(new Error('OCR timed out')), 60000)
     )
 
-    const result = (await Promise.race([ocrPromise, timeoutPromise])) as any
+    const result = (await Promise.race([ocrPromise, timeoutPromise])) as { data: { text: string } }
     const text = result.data.text
 
     const response: OcrResultResponse = {
@@ -94,7 +114,7 @@ async function handleOcrFile(filePath: string) {
   }
 }
 
-async function handleScanDir(dirPath: string) {
+async function handleScanDir(dirPath: string): Promise<void> {
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
 
@@ -120,7 +140,7 @@ async function handleScanDir(dirPath: string) {
             tags: []
             // metadata is optional so no change needed here for now
           })
-        } catch (statErr) {
+        } catch {
           // Ignore files we can't stat (race conditions etc)
         }
       }
@@ -133,7 +153,7 @@ async function handleScanDir(dirPath: string) {
     }
     parentPort?.postMessage(response)
   } catch (err: unknown) {
-    const errorMsg = (err as any).code || (err as any).message || String(err)
+    const errorMsg = err instanceof Error ? err.message : String(err)
     // EACCES or other IO errors on the directory itself
     const response: WorkerResponse = {
       type: WorkerMessageType.RES_ERROR,
