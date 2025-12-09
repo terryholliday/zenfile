@@ -61,7 +61,6 @@ export class DeduplicationService {
   async findSemanticDuplicates(files: FileNode[]): Promise<DuplicateCluster[]> {
     logger.info(`Starting Semantic Deduplication on ${files.length} files`)
 
-    // 1. Filter candidates: only files with extractable text content
     const candidates = files.filter((f) => {
       const ext = f.name.split('.').pop()?.toLowerCase() || ''
       const isPlaintext = PLAINTEXT_EXTENSIONS.has(ext)
@@ -71,46 +70,45 @@ export class DeduplicationService {
 
     if (candidates.length < 2) return []
 
+    // 1. Generate Embeddings (Batched)
     const embeddings: { id: string; vec: number[] }[] = []
-
-    // 2. Generate embeddings with batching for performance
     const BATCH_SIZE = 5
+    
     for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-      const batch = candidates.slice(i, i + BATCH_SIZE)
-      await Promise.all(
-        batch.map(async (file) => {
-          try {
-            let content: string | null = null
-            const ext = file.name.split('.').pop()?.toLowerCase() || ''
+        // Yield to event loop every few batches to keep UI responsive
+        if (i % 20 === 0) await new Promise(r => setImmediate(r))
+        
+        const batch = candidates.slice(i, i + BATCH_SIZE)
+        await Promise.all(batch.map(async (file) => {
+            try {
+                let content: string | null = null
+                const ext = file.name.split('.').pop()?.toLowerCase() || ''
 
-            if (PLAINTEXT_EXTENSIONS.has(ext)) {
-              // Safe to read as UTF-8
-              content = await fs.readFile(file.path, 'utf-8')
-            } else if (file.metadata?.text) {
-              // Use OCR-extracted text for binary files
-              content = file.metadata.text
-            }
+                if (PLAINTEXT_EXTENSIONS.has(ext)) {
+                    content = await fs.readFile(file.path, 'utf-8')
+                } else if (file.metadata?.text) {
+                    content = file.metadata.text
+                }
 
-            if (!content) return
+                if (!content) return
 
-            const snippet = content.substring(0, 1000)
-            if (!snippet.trim()) return
+                const snippet = content.substring(0, 1000)
+                if (!snippet.trim()) return
 
-            // AiService now handles caching - passing file.id allows reuse!
-            const vec = await aiService.generateEmbedding(snippet, file.id)
-            embeddings.push({ id: file.id, vec })
-          } catch (err) {
-            logger.warn(`Skipping ${file.name} for dedupe`, err)
-          }
-        })
-      )
+                const vec = await aiService.generateEmbedding(snippet, file.id)
+                embeddings.push({ id: file.id, vec })
+            } catch (err) { /* ignore */ }
+        }))
     }
 
-    // 3. Compare all pairs (O(n^2) - for larger sets, use clustering)
+    // 2. Compare Vectors (O(N^2))
     const clusters: DuplicateCluster[] = []
     const visited = new Set<string>()
 
     for (let i = 0; i < embeddings.length; i++) {
+      // RESPONSIVENESS FIX: Yield every 50 iterations to prevent freezing
+      if (i % 50 === 0) await new Promise(resolve => setImmediate(resolve))
+
       if (visited.has(embeddings[i].id)) continue
 
       const currentCluster: FileNode[] = [candidates.find((f) => f.id === embeddings[i].id)!]
@@ -120,7 +118,6 @@ export class DeduplicationService {
         if (visited.has(embeddings[j].id)) continue
 
         const similarity = this.getCosineSimilarity(embeddings[i].vec, embeddings[j].vec)
-
         if (similarity > 0.95) {
           const match = candidates.find((f) => f.id === embeddings[j].id)!
           currentCluster.push(match)
@@ -129,12 +126,14 @@ export class DeduplicationService {
       }
 
       if (currentCluster.length > 1) {
-        const hash = `semantic-${Date.now()}-${i}`
-        clusters.push({ hash, files: currentCluster, type: 'SEMANTIC' })
+        clusters.push({ 
+            hash: `semantic-${Date.now()}-${i}`, 
+            files: currentCluster, 
+            type: 'SEMANTIC' 
+        })
       }
     }
 
-    logger.info(`Found ${clusters.length} semantic duplicate clusters`)
     return clusters
   }
 }

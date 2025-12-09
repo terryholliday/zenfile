@@ -584,7 +584,11 @@ export class ScanService {
         this.session.largeFiles.push(f)
       }
 
-      f.tags = tagEngine.analyze(f)
+      // PERF FIX: Tagging is now done in Worker. 
+      // We only re-tag here if we had some specific Main-process-only logic (none for now).
+      // f.tags is already populated by worker.
+
+      // f.tags = tagEngine.analyze(f)
 
       // Track flagged files for live streaming to UI
       if (f.tags.length > 0) {
@@ -692,6 +696,9 @@ export class ScanService {
     } catch (err) {
       logger.error('Failed to save Vector DB', err)
     }
+
+    // MEMORY FIX: Clear the embedding cache now that deduplication is done
+    aiService.clearCache()
 
     logger.info('Scan complete.')
     this.updateState('COMPLETED', true)

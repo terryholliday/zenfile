@@ -143,7 +143,8 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
       } else if (entry.isFile()) {
         try {
           const stats = await fs.stat(fullPath)
-          files.push({
+          
+          const node: FileNode = {
             id: uuidv4(),
             path: fullPath,
             name: entry.name,
@@ -152,8 +153,12 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
             mtimeMs: stats.mtimeMs,
             isDirectory: false,
             tags: []
-            // metadata is optional so no change needed here for now
-          })
+          }
+
+          // PERF FIX: Run tagging in Worker, not Main
+          node.tags = tagEngine.analyze(node)
+
+          files.push(node)
         } catch {
           // Ignore files we can't stat (race conditions etc)
         }
