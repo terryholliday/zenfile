@@ -1,5 +1,5 @@
 import { parentPort } from 'worker_threads'
-import { pipeline, Pipeline } from '@xenova/transformers'
+import { pipeline } from '@xenova/transformers'
 
 // Define explicit message types for the AI worker
 export type AiWorkerCommand =
@@ -15,8 +15,11 @@ export type AiWorkerResponse =
 
 if (!parentPort) throw new Error('Must be run as a worker')
 
-let embedder: Pipeline | null = null
-let summarizer: Pipeline | null = null
+// Use `any` for pipeline instances since types are complex
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let embedder: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let summarizer: any = null
 
 parentPort.on('message', async (cmd: AiWorkerCommand) => {
   try {
@@ -53,8 +56,7 @@ parentPort.on('message', async (cmd: AiWorkerCommand) => {
           min_new_tokens: 20,
           do_sample: false
         })
-        // @ts-expect-error - Pipeline returns array with summary_text
-        const summary = result[0]?.summary_text || 'No summary.'
+        const summary = (result as { summary_text?: string }[])[0]?.summary_text || 'No summary.'
         parentPort?.postMessage({ type: 'SUMMARIZE_RES', summary })
         break
     }

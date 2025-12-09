@@ -146,6 +146,12 @@ export class ScanService {
   // Live streaming data for UI
   private recentFlaggedFiles: FileNode[] = []
 
+  // Scan phase tracking for deferred processing
+  // Phase 1: Directory scanning only (fast)
+  // Phase 2: OCR/Hashing (after dirs complete)
+  // Phase 3: AI indexing (runs in background after completion)
+  private scanPhase: 'DIRECTORIES' | 'PROCESSING' | 'FINALIZING' = 'DIRECTORIES'
+
   // -----------------
   // Public API
   // -----------------
@@ -205,6 +211,8 @@ export class ScanService {
     this.ocrQueue.clear()
     this.aiQueue.clear()
     this.resultFiles.clear()
+    this.recentFlaggedFiles = []
+    this.scanPhase = 'DIRECTORIES' // Reset to Phase 1
 
     this.workerReadyState = new Array(WORKER_POOL_SIZE).fill(false)
 
@@ -320,9 +328,8 @@ export class ScanService {
     if (!this.session) return ''
 
     const largeCount = this.session.largeFiles.length
-    const flaggedCount = this.recentFlaggedFiles.length
 
-    // Count tags
+    // Count tags from recent flagged files
     const tagCounts: Record<string, number> = {}
     for (const f of this.recentFlaggedFiles) {
       for (const tag of f.tags || []) {
@@ -388,63 +395,76 @@ export class ScanService {
   private processQueue(): void {
     if (!this.session || this.session.state !== 'SCANNING') return
 
-    const noWorkLeft =
-      this.dirQueue.isEmpty &&
-      this.hashQueue.isEmpty &&
-      this.ocrQueue.isEmpty &&
-      this.activeWorkers === 0
+    // Phase 1: Prioritize directory scanning
+    if (this.scanPhase === 'DIRECTORIES') {
+      const dirsComplete = this.dirQueue.isEmpty && this.activeWorkers === 0
 
-    if (noWorkLeft) {
-      if (this.session.duplicates.length === 0 && this.processedFiles > 0) {
-        void this.finalizeScan()
+      if (dirsComplete) {
+        // Transition to Phase 2: Process OCR and hashing
+        logger.info(
+          `Phase 1 complete: ${this.processedFiles} files discovered. Starting Phase 2 (OCR/Hashing)...`
+        )
+        this.scanPhase = 'PROCESSING'
       } else {
-        this.terminateWorkers()
-        this.updateState('COMPLETED', true)
-        // Let AI queue finish gradually
-        void this.processAiQueue()
+        // Continue directory scanning only
+        for (let i = 0; i < this.workers.length; i++) {
+          if (!this.workerReadyState[i]) continue
+
+          const dir = this.dirQueue.dequeue()
+          if (dir) {
+            this.dispatchToWorker(i, {
+              type: WorkerMessageType.CMD_SCAN_DIR,
+              path: dir,
+              exclusions: this.currentSettings?.excludePaths || []
+            })
+          }
+        }
+        return
+      }
+    }
+
+    // Phase 2: Process OCR and hashing (after all directories scanned)
+    if (this.scanPhase === 'PROCESSING') {
+      const processingComplete =
+        this.hashQueue.isEmpty && this.ocrQueue.isEmpty && this.activeWorkers === 0
+
+      if (processingComplete) {
+        // Transition to finalization
+        this.scanPhase = 'FINALIZING'
+        void this.finalizeScan()
+        return
+      }
+
+      // Dispatch OCR and hash work
+      for (let i = 0; i < this.workers.length; i++) {
+        if (!this.workerReadyState[i]) continue
+
+        // Prioritize hashing (faster than OCR)
+        const hashItem = this.hashQueue.dequeue()
+        if (hashItem) {
+          this.dispatchToWorker(i, {
+            type: WorkerMessageType.CMD_HASH_FILE,
+            id: hashItem.id,
+            filePath: hashItem.path
+          })
+          continue
+        }
+
+        // Then OCR
+        const ocrItem = this.ocrQueue.dequeue()
+        if (ocrItem) {
+          this.dispatchToWorker(i, {
+            type: WorkerMessageType.CMD_OCR_FILE,
+            id: ocrItem.id,
+            filePath: ocrItem.path
+          })
+          continue
+        }
       }
       return
     }
 
-    for (let i = 0; i < this.workers.length; i++) {
-      if (!this.workerReadyState[i]) continue
-
-      // 1. Directories
-      const dir = this.dirQueue.dequeue()
-      if (dir) {
-        this.dispatchToWorker(i, {
-          type: WorkerMessageType.CMD_SCAN_DIR,
-          path: dir,
-          // Pass exclusions to worker for atomic IPC filtering
-          exclusions: this.currentSettings?.excludePaths || []
-        })
-        continue
-      }
-
-      // 2. Hashing
-      const hashItem = this.hashQueue.dequeue()
-      if (hashItem) {
-        this.dispatchToWorker(i, {
-          type: WorkerMessageType.CMD_HASH_FILE,
-          id: hashItem.id,
-          filePath: hashItem.path
-        })
-        continue
-      }
-
-      // 3. OCR
-      const ocrItem = this.ocrQueue.dequeue()
-      if (ocrItem) {
-        this.dispatchToWorker(i, {
-          type: WorkerMessageType.CMD_OCR_FILE,
-          id: ocrItem.id,
-          filePath: ocrItem.path
-        })
-        continue
-      }
-    }
-
-    void this.processAiQueue()
+    // Phase 3 (FINALIZING) is handled by finalizeScan()
   }
 
   private dispatchToWorker(index: number, cmd: WorkerCommand): void {
@@ -642,14 +662,15 @@ export class ScanService {
   // -----------------
 
   private async finalizeScan(): Promise<void> {
+    // Check if we need to queue files for hashing (duplicate detection)
     if (this.processedHashes === 0 && this.resultFiles.size > 0) {
-      logger.info('Scan Phase 1 complete. Identifying candidates for hashing...')
-
       const candidates = this.identifyHashCandidates()
       if (candidates.length > 0) {
         this.hashQueue.clear()
         this.hashQueue.enqueue(...candidates.map((f) => ({ id: f.id, path: f.path })))
-        logger.info(`Queued ${this.hashQueue.size} files for hashing`)
+        logger.info(`Queued ${this.hashQueue.size} files for hashing (Phase 2)`)
+        // Go back to processing phase to handle hash queue
+        this.scanPhase = 'PROCESSING'
         this.processQueue()
         return
       }
@@ -668,7 +689,7 @@ export class ScanService {
     this.updateState('COMPLETED', true)
     this.terminateWorkers()
 
-    // Let AI queue drain
+    // Phase 3: Let AI queue drain in background
     void this.processAiQueue()
   }
 
