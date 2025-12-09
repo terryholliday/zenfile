@@ -56,9 +56,9 @@ export function ScanDashboard(): JSX.Element {
   }
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-[400px] w-full h-full overflow-hidden bg-[#050510]">
+    <div className="relative flex flex-col items-center min-h-[400px] w-full h-full overflow-y-auto bg-[#050510]">
       {/* 🌌 Premium 3D Background */}
-      <div className="absolute inset-0 z-0 opacity-80">
+      <div className="absolute inset-0 z-0 opacity-80 pointer-events-none">
         <ZenGalaxy />
       </div>
 
@@ -66,7 +66,7 @@ export function ScanDashboard(): JSX.Element {
       <div className="absolute inset-0 z-0 bg-radial-gradient-strong pointer-events-none" />
 
       {/* Main Content */}
-      <div className="z-10 flex flex-col items-center justify-center space-y-6 w-full max-w-4xl mx-auto p-4">
+      <div className="z-10 flex flex-col items-center space-y-6 w-full max-w-4xl mx-auto p-4 pt-8 pb-16">
         {/* Status Hub */}
         <div className="relative group">
           {/* Animated Glow Behind */}
@@ -277,8 +277,8 @@ export function ScanDashboard(): JSX.Element {
                   <span className="block truncate px-4">
                     {settings?.includePaths[0]
                       ? settings.includePaths[0]
-                          .split(settings.includePaths[0].includes('\\') ? '\\' : '/')
-                          .pop()
+                        .split(settings.includePaths[0].includes('\\') ? '\\' : '/')
+                        .pop()
                       : 'Select Folder'}
                   </span>
                 </button>
