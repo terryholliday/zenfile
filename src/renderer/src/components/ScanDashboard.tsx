@@ -105,7 +105,12 @@ export function ScanDashboard(): JSX.Element {
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center z-10"
               >
-                <h2 className="text-4xl font-black text-white tracking-tighter drop-shadow-glow">
+                <h2
+                  className={clsx(
+                    'font-black text-white tracking-tighter drop-shadow-glow transition-all',
+                    scanState.length > 8 ? 'text-2xl' : 'text-4xl'
+                  )}
+                >
                   {scanState === 'IDLE'
                     ? 'READY'
                     : scanState === 'SCANNING'

@@ -16,6 +16,7 @@ export enum IpcChannel {
 }
 
 export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED' | 'CANCELLED'
+
 export type FileTag =
   | 'DUPLICATE'
   | 'LARGE'
@@ -32,18 +33,18 @@ export type FileTag =
   | 'SENSITIVE'
 
 export interface FileNode {
-  id: string // UUID
-  path: string // Absolute path
+  id: string
+  path: string
   name: string
   sizeBytes: number
   atimeMs: number | null
   mtimeMs: number | null
   isDirectory: boolean
-  hash?: string // SHA-256
+  hash?: string
   tags: FileTag[]
   metadata?: {
-    text?: string // OCR content
-    lastIndex?: number // Timestamp of last index
+    text?: string
+    lastIndex?: number
   }
 }
 
@@ -54,24 +55,18 @@ export interface DuplicateCluster {
 }
 
 export interface Anchor {
-  id: string // Folder ID or Path hash
-  path: string // Folder Path
-  name: string // "AI Projects"
-  score: number // Confidence score
-  keywords: string[] // "transformer", "model", etc.
-}
-
-export interface Match {
-  fileId: string
-  confidence: number
-  reason: string // "Filename matches anchor keywords"
+  id: string
+  path: string
+  name: string
+  score: number
+  keywords: string[]
 }
 
 export interface Suggestion {
   id: string
   type: 'CONSOLIDATE' | 'ORGANIZE'
   anchor: Anchor
-  files: FileNode[] // Orphans
+  files: FileNode[]
   confidence: number
 }
 
@@ -95,10 +90,9 @@ export interface ScanSession {
   staleFiles: FileNode[]
   junkFiles: FileNode[]
   emptyFolders: FileNode[]
-  files: FileNode[] // All scanned files (for AI analysis)
+  files: FileNode[]
 }
 
-// IPC Payloads
 export interface ScanStartPayload {
   sessionId: string
   paths: string[]
@@ -112,10 +106,9 @@ export interface ScanProgressPayload {
   bytesScanned: number
   currentFile?: string
   progress: number
-  // Live streaming results
-  liveLargeFiles?: FileNode[]    // Rolling top 10 large files
-  liveFlaggedFiles?: FileNode[]  // Recently tagged files (last 5)
-  liveInsight?: string           // AI insight string
+  liveLargeFiles?: FileNode[]
+  liveFlaggedFiles?: FileNode[]
+  liveInsight?: string
 }
 
 export interface ActionPayload {
@@ -124,36 +117,24 @@ export interface ActionPayload {
   dryRun: boolean
 }
 
-// Preload API Contract
+export interface ActionResult {
+  success: string[]
+  failures: string[]
+}
+
 export interface FileZenApi {
   startScan(payload: ScanStartPayload): void
   cancelScan(payload: { sessionId: string }): void
   onScanProgress(handler: (payload: ScanProgressPayload) => void): () => void
-  moveToQuarantine(payload: ActionPayload): Promise<{ success: string[]; failures: string[] }>
-  sendToTrash(payload: ActionPayload): Promise<{ success: string[]; failures: string[] }>
+  moveToQuarantine(payload: ActionPayload): Promise<ActionResult>
+  sendToTrash(payload: ActionPayload): Promise<ActionResult>
   getSettings(): Promise<SettingsSchema>
   saveSettings(settings: SettingsSchema): Promise<void>
   openDirectory(): Promise<string | null>
   getResults(sessionId: string): Promise<ScanSession | null>
   getSuggestions(sessionId: string): Promise<Suggestion[]>
-  moveFiles(
-    payload: ActionPayload & { destination: string }
-  ): Promise<{ success: string[]; failures: string[] }>
-  aiSearch(query: string): Promise<any[]>
+  moveFiles(payload: ActionPayload & { destination: string }): Promise<ActionResult>
+  aiSearch(query: string): Promise<unknown[]>
   redactText(text: string): Promise<string>
-  generateProjectDna(folderPath: string): Promise<string> // Returns the generated summary
-}
-
-// --- AI / Smart Stack Types ---
-
-export type StackType = 'DATE' | 'PROJECT' | 'FILE_TYPE' | 'CUSTOM'
-
-export interface SmartStack {
-  id: string
-  label: string // e.g. "2024 Tax Docs"
-  type: StackType
-  confidence: number // 0-1
-  files: FileNode[]
-  reason: string // "Matches 'Tax' keyword and year 2024"
-  action: 'MOVE' | 'ZIP' | 'DELETE' | 'NONE'
+  generateProjectDna(folderPath: string): Promise<string>
 }

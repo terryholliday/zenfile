@@ -15,18 +15,14 @@ import {
 import { FileNode, FileTag } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
-// Simple inline Tag Logic (Copy of TagEngine rules to keep worker pure)
-const TAG_RULES = [
-  { tag: 'INVOICE', patterns: [/invoice/i, /bill/i, /receipt/i, /payment/i] },
-  { tag: 'CONTRACT', patterns: [/contract/i, /agreement/i, /nda/i, /terms/i, /sign/i] },
-  { tag: 'FINANCIAL', patterns: [/tax/i, /statement/i, /bank/i, /finance/i, /salary/i] },
-  { tag: 'PERSONAL', patterns: [/passport/i, /resume/i, /cv/i, /id_card/i, /driver/i] },
   { tag: 'SCREENSHOT', patterns: [/screen/i, /capture/i, /shot/i, /^img_\d{8}/i, /^screenshot/i] }
 ]
 
 function analyzeTags(fileName: string, text?: string): FileTag[] {
   const tags = new Set<string>()
-  const content = `${fileName} ${text || ''}`.toLowerCase()
+  // CAP INPUT LENGTH: Prevent regex ReDoS on massive minified files
+  const safeText = (text || '').substring(0, 5000) 
+  const content = `${fileName} ${safeText}`.toLowerCase()
 
   for (const rule of TAG_RULES) {
     for (const pattern of rule.patterns) {
@@ -37,6 +33,27 @@ function analyzeTags(fileName: string, text?: string): FileTag[] {
     }
   }
   return Array.from(tags) as FileTag[]
+}
+
+if (!parentPort) {
+  throw new Error('Worker must be spawned with parentPort')
+}
+
+// Global error handlers...
+// ... (omitted for brevity, assume existing) ...
+
+// Hardcoded defaults for safety, merged with incoming exclusions
+const DEFAULT_IGNORES = new Set([
+  'node_modules', '.git', '.DS_Store', 'Thumbs.db',
+  'dist', 'build', 'out', 'coverage', '.idea', '.vscode',
+  'src', 'app', 'components', 'pages', 'public' // Developer folders as requested
+])
+
+function shouldIgnore(name: string, exclusions: string[]): boolean {
+  if (DEFAULT_IGNORES.has(name)) return true
+  if (name.startsWith('.')) return true 
+  if (exclusions.includes(name)) return true
+  return false
 }
 
 if (!parentPort) {
@@ -67,16 +84,19 @@ process.on('unhandledRejection', (reason) => {
 let ocrWorker: TesseractWorker | null = null
 
 // Hardcoded defaults for safety, merged with incoming exclusions
-const DEFAULT_IGNORES = new Set(['node_modules', '.git', '.DS_Store', 'Thumbs.db'])
+const DEFAULT_IGNORES = new Set([
+  'node_modules', '.git', '.DS_Store', 'Thumbs.db',
+  'dist', 'build', 'out', 'coverage', '.idea', '.vscode',
+  'src', 'app', 'components', 'pages', 'public' // Developer folders as requested
+])
 
-function shouldIgnore(name: string, exclusions: string[]): boolean {
-  if (DEFAULT_IGNORES.has(name)) return true
-  // Simple check: Exact match or hidden file (starts with dot)
-  if (exclusions.includes(name)) return true
-  return false
-}
+function analyzeTags(fileName: string, text?: string): FileTag[] {
+  const tags = new Set<string>()
+  // CAP INPUT LENGTH: Prevent regex ReDoS on massive minified files
+  const safeText = (text || '').substring(0, 5000) 
+  const content = `${fileName} ${safeText}`.toLowerCase()
 
-async function getOcrWorker(): Promise<TesseractWorker> {
+  for (const rule of TAG_RULES) {
   if (!ocrWorker) {
     ocrWorker = await createWorker('eng')
   }
