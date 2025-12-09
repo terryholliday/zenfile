@@ -73,7 +73,8 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
         includePaths: paths,
         excludePaths: [],
         dryRun: true,
-        isDarkTheme: true
+        isDarkTheme: true,
+        enableOcr: false
       }
       set({ settings })
     }
@@ -88,10 +89,12 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       largeFiles: []
     })
 
+    const ensuredSettings = settings as SettingsSchema
+
     const payload: ScanStartPayload = {
       sessionId,
       paths,
-      settings
+      settings: ensuredSettings
     }
 
     window.fileZen.startScan(payload)
@@ -135,7 +138,8 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       includePaths: [],
       excludePaths: [],
       dryRun: true,
-      isDarkTheme: true
+      isDarkTheme: true,
+      enableOcr: false
     }
     const newSettings = { ...current, includePaths: [path] }
     set({ settings: newSettings })

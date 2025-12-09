@@ -1,12 +1,9 @@
 import { pipeline, Pipeline } from '@xenova/transformers'
 import { create, insert, search, type Orama } from '@orama/orama'
-import { app } from 'electron'
-import path from 'path'
 import { FileNode } from '../shared/types'
 import { logger } from './logger'
 
-// Type definition for vector storage schema
-interface FileSchema {
+interface IndexedDocument {
   id: string
   path: string
   content: string
@@ -94,7 +91,7 @@ export class AiService {
     const queryEmbedding = await this.generateEmbedding(query)
     
     // Orama vector search
-    const results = await search(this.db!, {
+    const results = await search<IndexedDocument>(this.db!, {
         mode: 'vector',
         vector: {
             value: queryEmbedding,
@@ -104,10 +101,10 @@ export class AiService {
         limit: 10
     })
 
-    return results.hits.map(hit => ({
-        id: hit.document.id,
-        path: hit.document.path,
-        score: hit.score
+    return results.hits.map((hit) => ({
+      id: hit.document.id,
+      path: hit.document.path,
+      score: hit.score
     }))
   }
 }

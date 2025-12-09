@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { clsx } from 'clsx'
-import { FileNode } from '../../../shared/types'
 
 interface SearchResult {
     id: string
