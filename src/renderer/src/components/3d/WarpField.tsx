@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unknown-property */
-import { useRef, useMemo, useLayoutEffect } from 'react'
+import { useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -62,7 +62,9 @@ export function WarpField({ isScanning }: WarpFieldProps): JSX.Element {
         }[]
     >([])
 
-    const dummy = useMemo(() => new THREE.Object3D(), [])
+    // Use a ref for the scratch object to avoid "modifying hook argument" lints
+    // calling new THREE.Object3D() once initially is safe
+    const dummyRef = useRef(new THREE.Object3D())
 
     useLayoutEffect(() => {
         particlesRef.current = generateParticles()
@@ -76,6 +78,8 @@ export function WarpField({ isScanning }: WarpFieldProps): JSX.Element {
         timeRef.current += delta * timeScale
 
         const particles = particlesRef.current
+        const dummy = dummyRef.current
+
         for (let i = 0; i < particles.length; i++) {
             const p = particles[i]
 
