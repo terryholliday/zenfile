@@ -83,9 +83,7 @@ function StackCard({ stack, onExecute, onDismiss }: {
 
 export function OrganizeDashboard() {
     const { stacks, isAnalyzing, analyze, executeStack, dismissStack } = useOrganizeStore()
-    const { files } = useScanStore(state => ({
-        files: state.files
-    }))
+    const files = useScanStore(state => state.files)
 
     // Auto-analyze when opened if data exists
     useEffect(() => {
@@ -104,8 +102,7 @@ export function OrganizeDashboard() {
                     </p>
                 </div>
                 {/* Undo Button */}
-                {/* @ts-ignore - history access */}
-                {useOrganizeStore(s => s.history && s.history.length > 0) && (
+                {useOrganizeStore(s => s.history.length > 0) && (
                     <button
                         onClick={() => useOrganizeStore.getState().undo()}
                         className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
