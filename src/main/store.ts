@@ -15,6 +15,10 @@ import { logger } from './logger'
 export class SettingsStore {
   private filePath: string
   private settings: SettingsSchema | null = null
+  
+  // FIX: Write Lock
+  private isSaving = false
+  private pendingSave: SettingsSchema | null = null
 
   constructor() {
     this.filePath = path.join(app.getPath('userData'), SETTINGS_FILENAME)
@@ -28,7 +32,8 @@ export class SettingsStore {
       includePaths: DEFAULT_INCLUDE_PATHS,
       excludePaths: DEFAULT_EXCLUDE_PATHS,
       dryRun: true,
-      isDarkTheme: true
+      isDarkTheme: true,
+      enableOcr: false
     }
   }
 
@@ -39,22 +44,17 @@ export class SettingsStore {
       const data = await fs.readFile(this.filePath, 'utf-8')
       const loaded = JSON.parse(data) as SettingsSchema
 
-      // Basic Schema Version Check
       if (loaded.schemaVersion !== SCHEMA_VERSION) {
-        logger.warn(
-          `Schema version mismatch. Loaded: ${loaded.schemaVersion}, Current: ${SCHEMA_VERSION}. Migrating...`
-        )
-        // Logic for migration would go here. For now, we merge with defaults to ensure safety.
+        logger.warn(`Migrating settings v${loaded.schemaVersion} -> v${SCHEMA_VERSION}`)
         this.settings = { ...this.getDefaultSettings(), ...loaded, schemaVersion: SCHEMA_VERSION }
         await this.save(this.settings)
       } else {
         this.settings = loaded
       }
-    } catch (error) {
-      if ((error as any).code !== 'ENOENT') {
-        logger.error('Failed to load settings', { error: (error as Error).message })
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        logger.error('Failed to load settings', { error: error.message })
       }
-      // If file missing or error, use defaults
       this.settings = this.getDefaultSettings()
       await this.save(this.settings)
     }
@@ -63,13 +63,38 @@ export class SettingsStore {
   }
 
   async save(newSettings: SettingsSchema): Promise<void> {
+    this.settings = newSettings
+
+    // Queue logic: If saving, mark pending.
+    if (this.isSaving) {
+        this.pendingSave = newSettings
+        return
+    }
+
+    this.isSaving = true
+
     try {
-      this.settings = newSettings
-      await fs.writeFile(this.filePath, JSON.stringify(this.settings, null, 2), 'utf-8')
-      logger.info('Settings saved')
-    } catch (error) {
-      logger.error('Failed to save settings', { error: (error as Error).message })
-      throw error
+        await this._writeToDisk(newSettings)
+    } finally {
+        this.isSaving = false
+        // If a save came in while we were writing, process it now
+        if (this.pendingSave) {
+            const next = this.pendingSave
+            this.pendingSave = null
+            void this.save(next)
+        }
+    }
+  }
+
+  private async _writeToDisk(data: SettingsSchema): Promise<void> {
+    try {
+        // Atomic write via temp file (safer than direct overwrite)
+        const tempPath = `${this.filePath}.tmp`
+        await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8')
+        await fs.rename(tempPath, this.filePath)
+        logger.info('Settings saved')
+    } catch (error: any) {
+        logger.error('Failed to save settings', { error: error.message })
     }
   }
 

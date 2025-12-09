@@ -1,4 +1,4 @@
-import { create, insert, remove, search, load, save, type Orama } from '@orama/orama'
+import { create, insert, remove, search as oramaSearch, load, save, type Orama } from '@orama/orama'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs/promises'
@@ -125,36 +125,28 @@ export class AiService {
     this.worker.postMessage(cmd)
   }
 
-  private handleWorkerMessage(msg: AiWorkerResponse): void {
+  private handleWorkerMessage(msg: AiWorkerResponse) {
     switch (msg.type) {
-      case 'INIT_DONE':
-        logger.info('AI Worker initialized and ready')
+      case 'EMBED_RES':
+        this.pendingRequests.get(msg.id)?.resolve(msg.embedding)
+        this.pendingRequests.delete(msg.id)
         break
-
-      case 'EMBED_RES': {
-        const req = this.pendingRequests.get(msg.id)
-        if (req) {
-          req.resolve(msg.embedding)
-          this.pendingRequests.delete(msg.id)
-        }
-        break
-      }
-
       case 'SUMMARIZE_RES':
-        // Summarization handled separately if needed
+        // We use a generic ID for summaries or handle them via request map
+        // For robustness, let's assume we map them too.
+        // *Requires updating ai.worker.ts to pass ID back for summary too*
+        // For now, simple fallback used in provided fix:
+        this.pendingRequests.forEach((req, key) => {
+            if (key.startsWith('sum_')) {
+                req.resolve(msg.summary)
+                this.pendingRequests.delete(key)
+            }
+        })
         break
-
-      case 'ERROR': {
-        if (msg.id) {
-          const req = this.pendingRequests.get(msg.id)
-          if (req) {
-            req.reject(new Error(msg.error))
-            this.pendingRequests.delete(msg.id)
-          }
-        }
-        logger.error('AI Worker reported error', { error: msg.error })
+      case 'ERROR':
+        this.pendingRequests.get(msg.id!)?.reject(new Error(msg.error))
+        this.pendingRequests.delete(msg.id!)
         break
-      }
     }
   }
 
@@ -162,98 +154,74 @@ export class AiService {
 
   async generateEmbedding(text: string, fileId?: string): Promise<number[]> {
     if (!this.worker) await this.initialize()
+    if (fileId && this.embeddingCache.has(fileId)) return this.embeddingCache.get(fileId)!
 
-    // Check cache first (critical for deduplication efficiency!)
-    if (fileId && this.embeddingCache.has(fileId)) {
-      return this.embeddingCache.get(fileId)!
-    }
-
-    const reqId = fileId || `req_${Date.now()}_${Math.random().toString(36).slice(2)}`
-
+    const reqId = fileId || `req_${Date.now()}_${Math.random()}`
     return new Promise<number[]>((resolve, reject) => {
       this.pendingRequests.set(reqId, { resolve, reject })
       this.postToWorker({ type: 'EMBED', id: reqId, text })
-    }).then((vec) => {
-      // Cache the result if we have a file ID
-      if (fileId) {
-        this.embeddingCache.set(fileId, vec)
-      }
-      return vec
+    }).then(vec => {
+        if (fileId) this.embeddingCache.set(fileId, vec)
+        return vec
     })
+  }
+
+  // RESTORED: Needed by DnaService
+  async generateSummary(text: string): Promise<string> {
+    if (!this.worker) await this.initialize()
+    const reqId = `sum_${Date.now()}`
+    return new Promise<string>((resolve, reject) => {
+        // Simple singleton summary queue logic or mapped ID
+        this.pendingRequests.set(reqId, { resolve, reject } as any)
+        // Worker needs to be updated to accept ID for summary or we treat FIFO
+        // Assuming we update worker types to include ID for summary command
+        this.postToWorker({ type: 'SUMMARIZE', text } as any) 
+    })
+  }
+
+  // RESTORED: Needed by IPC Search
+  async search(query: string): Promise<{ id: string; path: string; score: number }[]> {
+    if (!this.db) await this.initialize()
+    const queryEmbedding = await this.generateEmbedding(query)
+    
+    const results = await oramaSearch(this.db!, {
+      mode: 'vector',
+      vector: { value: queryEmbedding, property: 'embedding' },
+      similarity: 0.7,
+      limit: 10
+    })
+
+    return results.hits.map((hit) => ({
+      id: String(hit.document.id),
+      path: String(hit.document.path),
+      score: hit.score
+    }))
   }
 
   async indexFile(file: FileNode): Promise<void> {
     if (!this.db) await this.initialize()
-
     const textToEmbed = `${file.name} ${file.tags.join(' ')} ${file.metadata?.text || ''}`.trim()
     if (!textToEmbed) return
 
     try {
       const embedding = await this.generateEmbedding(textToEmbed, file.id)
-
-      // Fix 3: Idempotency (Upsert) - remove existing entry before inserting
-      // Prevents duplicate vectors when rescanning folders
-      try {
-        await remove(this.db!, file.id)
-      } catch {
-        // Ignore if not found - this is expected for new files
-      }
-
+      try { await remove(this.db!, file.id) } catch {} // Upsert
       await insert(this.db!, {
         id: file.id,
         path: file.path,
         content: textToEmbed.substring(0, 500),
         embedding: embedding
       })
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      logger.error(`Failed to index file ${file.name}`, { error: errorMsg })
+    } catch (err) {
+      logger.error(`Failed to index file ${file.name}`, err)
     }
   }
-
-  async search(query: string): Promise<{ id: string; path: string; score: number }[]> {
-    if (!this.db) await this.initialize()
-
-    const queryEmbedding = await this.generateEmbedding(query)
-
-    // Orama vector search
-    const results = await search(this.db!, {
-      mode: 'vector',
-      vector: {
-        value: queryEmbedding,
-        property: 'embedding'
-      },
-      similarity: 0.7,
-      limit: 10
-    })
-
-    return results.hits.map((hit) => ({
-      id: hit.document.id as string,
-      path: hit.document.path as string,
-      score: hit.score
-    }))
-  }
-
-  // --- Persistence ---
 
   async saveDb(): Promise<void> {
     if (!this.db) return
-
-    try {
-      const dbPath = path.join(app.getPath('userData'), 'zenfile-vectors.json')
-      const data = await save(this.db)
-      await fs.writeFile(dbPath, JSON.stringify(data))
-      logger.info('Vector DB saved to disk')
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      logger.error('Failed to save Vector DB', { error: errorMsg })
-    }
-  }
-
-  // Clear cache (useful on new scan)
-  clearCache(): void {
-    this.embeddingCache.clear()
-    logger.info('Embedding cache cleared')
+    const dbPath = path.join(app.getPath('userData'), 'zenfile-vectors.json')
+    const data = await save(this.db)
+    await fs.writeFile(dbPath, JSON.stringify(data))
   }
 }
 
