@@ -82,14 +82,14 @@ export function ScanDashboard() {
                         <motion.div
                             className={clsx("absolute inset-0 rounded-full border border-indigo-500/30 border-t-indigo-400", isScanning && "shadow-[0_0_30px_rgba(99,102,241,0.3)]")}
                             animate={isScanning ? { rotate: 360 } : { rotate: 0 }}
-                            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                            transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
                         />
 
                         {/* Inner Counter-Rotating Ring */}
                         <motion.div
                             className="absolute inset-4 rounded-full border border-white/10 border-b-white/50"
                             animate={isScanning ? { rotate: -360 } : { rotate: 0 }}
-                            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+                            transition={{ duration: 80, repeat: Infinity, ease: "linear" }}
                         />
 
                         {/* Glass Core */}
@@ -130,6 +130,31 @@ export function ScanDashboard() {
                         </span>
                     </div>
                 </div>
+
+                {/* Progress Bar */}
+                {isScanning && (
+                    <div className="w-full max-w-lg space-y-2">
+                        <div className="flex justify-between text-xs font-mono text-indigo-300/70 uppercase tracking-widest">
+                            <span>Progress</span>
+                            <span>{scanState === 'SCANNING' ? 'Processing...' : 'Paused'}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden backdrop-blur-sm border border-white/5">
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500"
+                                initial={{ width: "0%" }}
+                                animate={{
+                                    width: "100%",
+                                    transition: {
+                                        duration: 2,
+                                        repeat: Infinity,
+                                        ease: "linear",
+                                        repeatType: "loop"
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {/* Dynamic Quote Area */}
                 <div className="h-16 flex items-center justify-center">

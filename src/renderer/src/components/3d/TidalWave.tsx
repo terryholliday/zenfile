@@ -41,7 +41,7 @@ const WaveMaterial = shaderMaterial(
       float dist = distance(vUv, vec2(0.5));
       
       // Animate rings
-      float ring = sin(dist * 20.0 - uTime * 5.0);
+      float ring = sin(dist * 10.0 - uTime * 2.0);
       float strength = 0.05 / abs(ring);
       
       // Fade out at edges
@@ -71,7 +71,7 @@ export function TidalWave({ isActive = false, speed = 0.5, ...props }: { isActiv
             if (isActive) {
                 materialRef.current.uTime += delta * speed
                 // Fade in
-                materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0.4, delta * 2)
+                materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0.2, delta * 2)
             } else {
                 // Fade out
                 materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0, delta * 2)

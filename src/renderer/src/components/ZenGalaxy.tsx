@@ -1,10 +1,10 @@
 import { useRef, useMemo, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Stars, Html, Sparkles, Float, Billboard } from '@react-three/drei'
+import { OrbitControls, Html, Float } from '@react-three/drei'
 import { useScanStore } from '../store/useScanStore'
 import { FileNode, DuplicateCluster } from '../../../shared/types'
 import * as THREE from 'three'
-import { TidalWave } from './3d/TidalWave'
+import { WarpField } from './3d/WarpField'
 
 // --- Visual Components ---
 
@@ -195,25 +195,28 @@ export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} intensity={1} />
 
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-      <Sparkles count={500} scale={50} size={2} speed={0.4} opacity={0.5} noise={0.2} color="#ffffff" />
-
-      {/* Wave always faces camera to look like it surrounds the UI */}
-      <Billboard>
-        <TidalWave isActive={scanState === 'SCANNING'} speed={0.2} />
-      </Billboard>
+      {/* Warp Field - "Space Travel" Effect */}
+      <WarpField isScanning={scanState === 'SCANNING'} />
 
       {/* Content */}
       {ready && (
         <>
-          {/* Large Files as Blue/Teal Planets */}
+          {/* Large Files as Blue/Teal Planets or Supernovae */}
           {largeFilePositions.map(({ file, position }, i) => (
-            <FilePlanet
-              key={file.id}
-              file={file}
-              position={position}
-              color={i % 2 === 0 ? "#4f46e5" : "#06b6d4"}
-            />
+            file.sizeBytes > 100 * 1024 * 1024 ? ( // > 100MB
+              <Supernova
+                key={file.id}
+                file={file}
+                position={position}
+              />
+            ) : (
+              <FilePlanet
+                key={file.id}
+                file={file}
+                position={position}
+                color={i % 2 === 0 ? "#4f46e5" : "#06b6d4"}
+              />
+            )
           ))}
 
           {/* Duplicates as Burning Suns */}
@@ -238,5 +241,51 @@ export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
         minDistance={5}
       />
     </Canvas>
+  )
+}
+
+function Supernova({ file, position }: { file: FileNode; position: [number, number, number] }) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const [hovered, setHover] = useState(false)
+
+  useFrame((state, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z += delta * 0.2
+      meshRef.current.rotation.y += delta * 0.5
+    }
+  })
+
+  return (
+    <group position={position}>
+      {/* Core */}
+      <mesh ref={meshRef} onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
+        <sphereGeometry args={[1.5, 32, 32]} />
+        <meshStandardMaterial
+          color="#ff0088"
+          emissive="#ff00aa"
+          emissiveIntensity={2}
+          toneMapped={false}
+        />
+        <pointLight distance={15} intensity={5} color="#ff00aa" />
+      </mesh>
+
+      {/* Accretion Disk / Rings */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.8, 3.5, 64]} />
+        <meshBasicMaterial color="#aa00ff" side={THREE.DoubleSide} transparent opacity={0.4} />
+      </mesh>
+
+      <Sparkles count={30} scale={6} size={5} speed={0.8} opacity={1} color="#ffbbff" />
+
+      {hovered && (
+        <Html distanceFactor={15}>
+          <div className="bg-black/90 text-white p-3 rounded-lg border border-pink-500/50 backdrop-blur-xl shadow-2xl pointer-events-none transform translate-y-[-100%]">
+            <div className="font-bold text-sm mb-1 text-pink-400">SUPERNOVA (Large File)</div>
+            <div className="font-bold text-xs mb-1">{file.name}</div>
+            <div className="text-gray-400 text-xs text-nowrap">{(file.sizeBytes / 1024 / 1024).toFixed(2)} MB</div>
+          </div>
+        </Html>
+      )}
+    </group>
   )
 }

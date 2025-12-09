@@ -249,21 +249,25 @@ export class ScanService {
         this.workerReadyState[index] = true
         break
       case WorkerMessageType.RES_SCAN_RESULT:
+        this.workerReadyState[index] = true // Mark ready immediately
         this.activeWorkers--
         this.handleScanResult(msg)
         this.processQueue()
         break
       case WorkerMessageType.RES_HASH_RESULT:
+        this.workerReadyState[index] = true // Mark ready immediately
         this.activeWorkers--
         this.handleHashResult(msg)
         this.processQueue()
         break
       case WorkerMessageType.RES_OCR_RESULT:
+        this.workerReadyState[index] = true // Mark ready immediately
         this.activeWorkers--
         this.handleOcrResult(msg)
         this.processQueue()
         break
       case WorkerMessageType.RES_ERROR:
+        this.workerReadyState[index] = true // Mark ready immediately
         this.activeWorkers--
         logger.warn(`Worker Error: ${msg.error} at ${msg.path}`)
         this.processQueue()
