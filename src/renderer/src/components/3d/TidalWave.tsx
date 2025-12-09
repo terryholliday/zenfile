@@ -6,13 +6,13 @@ import { shaderMaterial } from '@react-three/drei'
 
 // Define the shader material
 const WaveMaterial = shaderMaterial(
-    {
-        uTime: 0,
-        uColor: new THREE.Color(0.2, 0.4, 1.0),
-        uOpacity: 0.6,
-    },
-    // Vertex Shader
-    `
+  {
+    uTime: 0,
+    uColor: new THREE.Color(0.2, 0.4, 1.0),
+    uOpacity: 0.6
+  },
+  // Vertex Shader
+  `
     varying vec2 vUv;
     varying float vElevation;
     uniform float uTime;
@@ -29,8 +29,8 @@ const WaveMaterial = shaderMaterial(
       gl_Position = projectionPosition;
     }
   `,
-    // Fragment Shader
-    `
+  // Fragment Shader
+  `
     uniform float uTime;
     uniform vec3 uColor;
     uniform float uOpacity;
@@ -55,41 +55,53 @@ const WaveMaterial = shaderMaterial(
 extend({ WaveMaterial })
 
 declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            waveMaterial: any
-        }
+  namespace JSX {
+    interface IntrinsicElements {
+      waveMaterial: any
     }
+  }
 }
 
-export function TidalWave({ isActive = false, speed = 0.5, ...props }: { isActive?: boolean; speed?: number } & JSX.IntrinsicElements['mesh']) {
-    const materialRef = useRef<any>()
+export function TidalWave({
+  isActive = false,
+  speed = 0.5,
+  ...props
+}: { isActive?: boolean; speed?: number } & JSX.IntrinsicElements['mesh']) {
+  const materialRef = useRef<any>()
 
-    useFrame((state, delta) => {
-        if (materialRef.current) {
-            // Only animate time if active
-            if (isActive) {
-                materialRef.current.uTime += delta * speed
-                // Fade in
-                materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0.2, delta * 2)
-            } else {
-                // Fade out
-                materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0, delta * 2)
-            }
-        }
-    })
+  useFrame((state, delta) => {
+    if (materialRef.current) {
+      // Only animate time if active
+      if (isActive) {
+        materialRef.current.uTime += delta * speed
+        // Fade in
+        materialRef.current.uOpacity = THREE.MathUtils.lerp(
+          materialRef.current.uOpacity,
+          0.2,
+          delta * 2
+        )
+      } else {
+        // Fade out
+        materialRef.current.uOpacity = THREE.MathUtils.lerp(
+          materialRef.current.uOpacity,
+          0,
+          delta * 2
+        )
+      }
+    }
+  })
 
-    return (
-        <mesh {...props}>
-            <planeGeometry args={[100, 100, 128, 128]} />
-            {/* @ts-ignore */}
-            <waveMaterial
-                ref={materialRef}
-                transparent
-                depthWrite={false}
-                blending={THREE.AdditiveBlending}
-                uOpacity={0} // Start invisible
-            />
-        </mesh>
-    )
+  return (
+    <mesh {...props}>
+      <planeGeometry args={[100, 100, 128, 128]} />
+      {/* @ts-ignore */}
+      <waveMaterial
+        ref={materialRef}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        uOpacity={0} // Start invisible
+      />
+    </mesh>
+  )
 }

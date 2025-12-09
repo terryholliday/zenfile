@@ -83,18 +83,18 @@ app.whenReady().then(() => {
   ipcMain.handle(IpcChannel.ActionMove, (_, payload) => scanService.moveFiles(payload))
   ipcMain.handle(IpcChannel.GetResults, (_, sessionId) => scanService.getResults(sessionId))
   ipcMain.handle(IpcChannel.AiSearch, async (_, query) => {
-      // Lazy load AI service on first search if not already ready
-      return await import('./ai-service').then(m => m.aiService.search(query))
+    // Lazy load AI service on first search if not already ready
+    return await import('./ai-service').then((m) => m.aiService.search(query))
   })
 
   ipcMain.handle(IpcChannel.RedactText, async (_, text) => {
-      const { privacyService } = await import('./privacy-service')
-      return privacyService.redact(text)
+    const { privacyService } = await import('./privacy-service')
+    return privacyService.redact(text)
   })
-  
+
   ipcMain.handle(IpcChannel.GenerateProjectDna, async (_, folderPath) => {
-      const { dnaService } = await import('./dna-service')
-      return dnaService.generateProjectDna(folderPath)
+    const { dnaService } = await import('./dna-service')
+    return dnaService.generateProjectDna(folderPath)
   })
 
   createWindow()

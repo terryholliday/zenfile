@@ -26,12 +26,12 @@ export class PrivacyService {
    */
   detect(text: string): string[] {
     const detected: Set<string> = new Set()
-    
+
     if (this.patterns.email.test(text)) detected.add('EMAIL')
     if (this.patterns.phone.test(text)) detected.add('PHONE')
     if (this.patterns.ssn.test(text)) detected.add('SSN')
     if (this.patterns.creditCard.test(text)) detected.add('CREDIT_CARD')
-    
+
     return Array.from(detected)
   }
 
@@ -40,12 +40,12 @@ export class PrivacyService {
    */
   redact(text: string, char = '█'): string {
     let redacted = text
-    
+
     redacted = redacted.replace(this.patterns.email, (match) => char.repeat(match.length))
     redacted = redacted.replace(this.patterns.phone, (match) => char.repeat(match.length))
     redacted = redacted.replace(this.patterns.ssn, (match) => 'XXX-XX-XXXX') // Standard SSN redaction
     redacted = redacted.replace(this.patterns.creditCard, (match) => '****-****-****-****')
-    
+
     return redacted
   }
 }

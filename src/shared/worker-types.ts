@@ -63,4 +63,9 @@ export interface ReadyResponse {
   type: WorkerMessageType.RES_READY
 }
 
-export type WorkerResponse = ScanResultResponse | HashResultResponse | ErrorResponse | ReadyResponse | OcrResultResponse
+export type WorkerResponse =
+  | ScanResultResponse
+  | HashResultResponse
+  | ErrorResponse
+  | ReadyResponse
+  | OcrResultResponse

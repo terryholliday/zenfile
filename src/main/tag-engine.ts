@@ -36,8 +36,6 @@ export class TagEngine {
     }
   ]
 
-
-
   analyze(file: FileNode): FileTag[] {
     const tags: Set<FileTag> = new Set()
     const content = `${file.name} ${file.metadata?.text || ''}`
@@ -48,7 +46,6 @@ export class TagEngine {
         tags.add(rule.tag)
       }
     }
-
 
     return Array.from(tags)
   }

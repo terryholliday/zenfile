@@ -75,12 +75,16 @@ export function SettingsDashboard() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <label className="block text-base font-medium text-white">Deep Scan OCR</label>
-              <span className="bg-purple-500/20 text-purple-300 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Experimental</span>
+              <span className="bg-purple-500/20 text-purple-300 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                Experimental
+              </span>
             </div>
             <p className="text-sm text-neutral-400 max-w-lg">
               Use AI vision to read text inside images (screenshots, scanned docs).
               <br />
-              <span className="text-yellow-500/80 text-xs">⚠️ May significantly increase scan time.</span>
+              <span className="text-yellow-500/80 text-xs">
+                ⚠️ May significantly increase scan time.
+              </span>
             </p>
           </div>
           <button

@@ -41,28 +41,28 @@ export class AiService {
       // 1. Load Embedding Model
       if (!this.model) {
         this.model = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-             quantized: true,
+          quantized: true
         })
       }
 
       // 2. Load Summarization Model (Lazy load or parallel)
       // Using DistilBART or T5. DistilBART is faster for summarization.
       if (!this.summarizer) {
-         this.summarizer = await pipeline('summarization', 'Xenova/distilbart-cnn-6-6', {
-            quantized: true
-         })
+        this.summarizer = await pipeline('summarization', 'Xenova/distilbart-cnn-6-6', {
+          quantized: true
+        })
       }
 
       // 3. Initialize Vector DB
       if (!this.db) {
-          this.db = await create({
-            schema: {
-              id: 'string',
-              path: 'string',
-              content: 'string',
-              embedding: 'vector[384]',
-            },
-          })
+        this.db = await create({
+          schema: {
+            id: 'string',
+            path: 'string',
+            content: 'string',
+            embedding: 'vector[384]'
+          }
+        })
       }
 
       logger.info('AI Service Initialized Successfully')
@@ -74,25 +74,25 @@ export class AiService {
   }
 
   async generateSummary(text: string): Promise<string> {
-      if (!this.summarizer) await this.initialize()
-      if (!this.summarizer) throw new Error("Summarizer model failed to load")
-      
-      try {
-          // Truncate input if too long (rough char count)
-          const input = text.substring(0, 4000)
-          const result = await this.summarizer(input, {
-              max_new_tokens: 100,
-              min_new_tokens: 20,
-              do_sample: false
-          })
-          
-          // Result is usually [{ summary_text: "..." }]
-          // @ts-ignore
-          return result[0]?.summary_text || "No summary generated."
-      } catch (err: any) {
-          logger.error("Summarization failed", err)
-          return "Unable to generate summary."
-      }
+    if (!this.summarizer) await this.initialize()
+    if (!this.summarizer) throw new Error('Summarizer model failed to load')
+
+    try {
+      // Truncate input if too long (rough char count)
+      const input = text.substring(0, 4000)
+      const result = await this.summarizer(input, {
+        max_new_tokens: 100,
+        min_new_tokens: 20,
+        do_sample: false
+      })
+
+      // Result is usually [{ summary_text: "..." }]
+      // @ts-ignore
+      return result[0]?.summary_text || 'No summary generated.'
+    } catch (err: any) {
+      logger.error('Summarization failed', err)
+      return 'Unable to generate summary.'
+    }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
@@ -105,21 +105,21 @@ export class AiService {
 
   async indexFile(file: FileNode) {
     if (!this.db) await this.initialize()
-    
+
     const textToEmbed = `${file.name} ${file.tags.join(' ')} ${file.metadata?.text || ''}`.trim()
     if (!textToEmbed) return
 
     try {
-        const embedding = await this.generateEmbedding(textToEmbed)
-        
-        await insert(this.db!, {
-          id: file.id,
-          path: file.path,
-          content: textToEmbed.substring(0, 500), // Store snippet
-          embedding: embedding
-        })
+      const embedding = await this.generateEmbedding(textToEmbed)
+
+      await insert(this.db!, {
+        id: file.id,
+        path: file.path,
+        content: textToEmbed.substring(0, 500), // Store snippet
+        embedding: embedding
+      })
     } catch (err: any) {
-        logger.error(`Failed to index file ${file.name}`, { error: err.message })
+      logger.error(`Failed to index file ${file.name}`, { error: err.message })
     }
   }
 
@@ -127,22 +127,22 @@ export class AiService {
     if (!this.db) await this.initialize()
 
     const queryEmbedding = await this.generateEmbedding(query)
-    
+
     // Orama vector search
     const results = await search(this.db!, {
-        mode: 'vector',
-        vector: {
-            value: queryEmbedding,
-            property: 'embedding'
-        },
-        similarity: 0.7, // Threshold
-        limit: 10
+      mode: 'vector',
+      vector: {
+        value: queryEmbedding,
+        property: 'embedding'
+      },
+      similarity: 0.7, // Threshold
+      limit: 10
     })
 
-    return results.hits.map(hit => ({
-        id: hit.document.id,
-        path: hit.document.path,
-        score: hit.score
+    return results.hits.map((hit) => ({
+      id: hit.document.id,
+      path: hit.document.path,
+      score: hit.score
     }))
   }
 }

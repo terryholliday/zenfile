@@ -62,7 +62,7 @@ export class ScanService {
     this.currentSettings = payload.settings
 
     // ... existing initialization ...
-    
+
     this.resetState()
     this.dirQueue.push(...payload.paths)
     await this.initializeWorkers()
@@ -87,22 +87,22 @@ export class ScanService {
     this.ocrQueue = []
     this.resultFiles.clear()
     this.workerReadyState = new Array(WORKER_POOL_SIZE).fill(false)
-    
+
     // Reset Session
     if (this.session) {
-        this.session.files = []
-        this.session.duplicates = []
-        this.session.largeFiles = []
+      this.session.files = []
+      this.session.duplicates = []
+      this.session.largeFiles = []
     } else {
-        // Create fresh session object if needed - though start() usually relies on existing or passed ID
-        // In this architecture, start() creates the session *ID* via store, but the Service holds state.
-        // We should ensure `this.session` is initialized properly. 
-        // Ideally start() passed the full session structure, but currently it passes paths/settings.
-        // We'll init a basic session struct here if null, but usually it should be set.
-        // Looking at start(), it sets state but doesn't create `this.session` structure explicitly? 
-        // Wait, start in store creates sessionId. The service needs to track it.
-        // Let's assume start() sets `this.session` via `ScanStartPayload` but payload only has sessionId.
-        // We need to init `this.session` in start() or resetState().
+      // Create fresh session object if needed - though start() usually relies on existing or passed ID
+      // In this architecture, start() creates the session *ID* via store, but the Service holds state.
+      // We should ensure `this.session` is initialized properly.
+      // Ideally start() passed the full session structure, but currently it passes paths/settings.
+      // We'll init a basic session struct here if null, but usually it should be set.
+      // Looking at start(), it sets state but doesn't create `this.session` structure explicitly?
+      // Wait, start in store creates sessionId. The service needs to track it.
+      // Let's assume start() sets `this.session` via `ScanStartPayload` but payload only has sessionId.
+      // We need to init `this.session` in start() or resetState().
     }
   }
 
@@ -110,30 +110,32 @@ export class ScanService {
     this.terminateWorkers()
     // In production/dev with electron-vite, worker.js is a sibling of index.js (where this code effectively runs)
     const workerScript = path.join(__dirname, 'worker.js')
-    
+
     logger.info(`Spawning ${WORKER_POOL_SIZE} workers from ${workerScript}`)
 
     const promises: Promise<void>[] = []
 
     for (let i = 0; i < WORKER_POOL_SIZE; i++) {
-        promises.push(new Promise((resolve) => {
-            const worker = new Worker(workerScript)
-            
-            worker.on('message', (msg: WorkerResponse) => {
-                if (msg.type === WorkerMessageType.RES_READY) {
-                    this.handleWorkerMessage(i, msg)
-                    resolve()
-                } else {
-                    this.handleWorkerMessage(i, msg)
-                }
-            })
-            
-            worker.on('error', (err) => {
-                logger.error(`Worker ${i} error:`, err)
-            })
+      promises.push(
+        new Promise((resolve) => {
+          const worker = new Worker(workerScript)
 
-            this.workers.push(worker)
-        }))
+          worker.on('message', (msg: WorkerResponse) => {
+            if (msg.type === WorkerMessageType.RES_READY) {
+              this.handleWorkerMessage(i, msg)
+              resolve()
+            } else {
+              this.handleWorkerMessage(i, msg)
+            }
+          })
+
+          worker.on('error', (err) => {
+            logger.error(`Worker ${i} error:`, err)
+          })
+
+          this.workers.push(worker)
+        })
+      )
     }
 
     await Promise.all(promises)
@@ -141,47 +143,47 @@ export class ScanService {
   }
 
   private terminateWorkers() {
-      for (const worker of this.workers) {
-          worker.postMessage({ type: WorkerMessageType.CMD_TERMINATE })
-          // worker.terminate() // Let it exit gracefully if possible, or terminate force
-          void worker.terminate()
-      }
-      this.workers = []
-      this.workerReadyState = []
+    for (const worker of this.workers) {
+      worker.postMessage({ type: WorkerMessageType.CMD_TERMINATE })
+      // worker.terminate() // Let it exit gracefully if possible, or terminate force
+      void worker.terminate()
+    }
+    this.workers = []
+    this.workerReadyState = []
   }
 
   private updateState(state: ScannerState, force = false) {
-      if (!this.session) {
-          // Init session if missing (should be done in start, but safety net)
-          this.session = {
-              id: 'temp', 
-              startTime: Date.now(),
-              state: 'IDLE',
-              files: [],
-              duplicates: [],
-              largeFiles: []
-          }
+    if (!this.session) {
+      // Init session if missing (should be done in start, but safety net)
+      this.session = {
+        id: 'temp',
+        startTime: Date.now(),
+        state: 'IDLE',
+        files: [],
+        duplicates: [],
+        largeFiles: []
       }
-      
-      this.session.state = state
-      
-      const now = Date.now()
-      if (force || now - this.lastUpdate > 200) {
-          this.lastUpdate = now
-          const payload: ScanProgressPayload = {
-              sessionId: this.session.id,
-              state: this.session.state,
-              filesScanned: this.processedFiles,
-              bytesScanned: this.processedBytes,
-              currentFile: this.lastScannedFile,
-              progress: 0 // TODO calc progress
-          }
-          
-          // Send to all windows
-          BrowserWindow.getAllWindows().forEach(win => {
-              win.webContents.send(IpcChannel.ScanProgress, payload)
-          })
+    }
+
+    this.session.state = state
+
+    const now = Date.now()
+    if (force || now - this.lastUpdate > 200) {
+      this.lastUpdate = now
+      const payload: ScanProgressPayload = {
+        sessionId: this.session.id,
+        state: this.session.state,
+        filesScanned: this.processedFiles,
+        bytesScanned: this.processedBytes,
+        currentFile: this.lastScannedFile,
+        progress: 0 // TODO calc progress
       }
+
+      // Send to all windows
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send(IpcChannel.ScanProgress, payload)
+      })
+    }
   }
 
   // ...
@@ -190,7 +192,12 @@ export class ScanService {
     if (!this.session || this.session.state !== 'SCANNING') return
 
     // Completion Check
-    if (this.dirQueue.length === 0 && this.hashQueue.length === 0 && this.ocrQueue.length === 0 && this.activeWorkers === 0) {
+    if (
+      this.dirQueue.length === 0 &&
+      this.hashQueue.length === 0 &&
+      this.ocrQueue.length === 0 &&
+      this.activeWorkers === 0
+    ) {
       if (this.session.duplicates.length === 0 && this.processedFiles > 0) {
         this.finalizeScan()
       } else {
@@ -242,7 +249,6 @@ export class ScanService {
     }
   }
 
-
   private handleWorkerMessage(index: number, msg: WorkerResponse) {
     switch (msg.type) {
       case WorkerMessageType.RES_READY:
@@ -276,29 +282,38 @@ export class ScanService {
   }
 
   private shouldIgnore(filePath: string): boolean {
-      const excludes = this.currentSettings?.excludePaths || []
-       // Always include defaults if not present
-       // (Naive check, ideally merge sets)
-       const defaults = ['node_modules', '.git', 'AppData', 'Library', '/System', 'C:\\Windows', 'Temp', 'tmp']
-       
-       const basename = path.basename(filePath)
-       
-       // Check against exact name matches
-       if (defaults.includes(basename) || excludes.includes(basename)) return true
-       
-       // Check if path contains any ignored segment
-       // This is expensive but necessary for top-level recursive ignores
-       // We'll optimize by just checking if the *current* dir/file is the ignored one, 
-       // since we filter dirs before recursing.
-       
-       return false
+    const excludes = this.currentSettings?.excludePaths || []
+    // Always include defaults if not present
+    // (Naive check, ideally merge sets)
+    const defaults = [
+      'node_modules',
+      '.git',
+      'AppData',
+      'Library',
+      '/System',
+      'C:\\Windows',
+      'Temp',
+      'tmp'
+    ]
+
+    const basename = path.basename(filePath)
+
+    // Check against exact name matches
+    if (defaults.includes(basename) || excludes.includes(basename)) return true
+
+    // Check if path contains any ignored segment
+    // This is expensive but necessary for top-level recursive ignores
+    // We'll optimize by just checking if the *current* dir/file is the ignored one,
+    // since we filter dirs before recursing.
+
+    return false
   }
 
   private handleScanResult(res: ScanResultResponse) {
     if (!this.session) return
 
     // Filter Directories
-    const validDirs = res.dirs.filter(d => !this.shouldIgnore(d))
+    const validDirs = res.dirs.filter((d) => !this.shouldIgnore(d))
     this.dirQueue.push(...validDirs)
 
     // Filter Files
@@ -313,30 +328,49 @@ export class ScanService {
       if (f.sizeBytes > 100 * 1024 * 1024) {
         this.session?.largeFiles.push(f)
       }
-      
+
       // Auto-Tagging (Filename based)
       f.tags = tagEngine.analyze(f)
-      
+
       // Index for AI Search - WHITELIST ONLY
       const ext = path.extname(f.name).toLowerCase()
       const allowedIndexExtensions = [
-          '.txt', '.md', '.markdown', 
-          '.pdf', '.docx', '.doc', '.rtf',
-          '.ts', '.tsx', '.js', '.jsx', '.json',
-          '.py', '.java', '.c', '.cpp', '.h', '.cs', 
-          '.go', '.rs', '.php', '.rb',
-          '.html', '.css', '.scss'
+        '.txt',
+        '.md',
+        '.markdown',
+        '.pdf',
+        '.docx',
+        '.doc',
+        '.rtf',
+        '.ts',
+        '.tsx',
+        '.js',
+        '.jsx',
+        '.json',
+        '.py',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
+        '.cs',
+        '.go',
+        '.rs',
+        '.php',
+        '.rb',
+        '.html',
+        '.css',
+        '.scss'
       ]
-      
+
       if (allowedIndexExtensions.includes(ext)) {
-          aiService.indexFile(f).catch(err => logger.error('Index failed', err))
+        aiService.indexFile(f).catch((err) => logger.error('Index failed', err))
       }
-      
+
       // OCR Queue Logic
       if (this.currentSettings?.enableOcr) {
-          if (['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp'].includes(ext)) {
-              this.ocrQueue.push(f.path)
-          }
+        if (['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp'].includes(ext)) {
+          this.ocrQueue.push(f.path)
+        }
       }
     })
 
@@ -358,18 +392,18 @@ export class ScanService {
   private handleOcrResult(res: any) {
     if (!this.session) return
     for (const file of this.resultFiles.values()) {
-        if (file.path === res.filePath) {
-            file.metadata = { ...file.metadata, text: res.text }
-            // Re-analyze tags with new text content
-            const newTags = tagEngine.analyze(file)
-            // Merge tags avoiding duplicates
-            const merged = new Set([...file.tags, ...newTags])
-            file.tags = Array.from(merged)
+      if (file.path === res.filePath) {
+        file.metadata = { ...file.metadata, text: res.text }
+        // Re-analyze tags with new text content
+        const newTags = tagEngine.analyze(file)
+        // Merge tags avoiding duplicates
+        const merged = new Set([...file.tags, ...newTags])
+        file.tags = Array.from(merged)
 
-            // Re-index with new content
-            aiService.indexFile(file).catch(err => logger.error('Re-index failed', err))
-            break
-        }
+        // Re-index with new content
+        aiService.indexFile(file).catch((err) => logger.error('Re-index failed', err))
+        break
+      }
     }
     this.processedOcrDocs++
     this.updateState('SCANNING')
@@ -436,17 +470,19 @@ export class ScanService {
     // Semantic Deduplication Trigger
     // We do this after exact match, as it's more expensive
     try {
-        const { deduplicationService } = await import('./deduplication-service')
-        const semanticClusters = await deduplicationService.findSemanticDuplicates(this.session.files)
-        if (semanticClusters.length > 0) {
-            this.session.duplicates.push(...semanticClusters)
-            logger.info(`Added ${semanticClusters.length} semantic clusters to results`)
-        }
+      const { deduplicationService } = await import('./deduplication-service')
+      const semanticClusters = await deduplicationService.findSemanticDuplicates(this.session.files)
+      if (semanticClusters.length > 0) {
+        this.session.duplicates.push(...semanticClusters)
+        logger.info(`Added ${semanticClusters.length} semantic clusters to results`)
+      }
     } catch (err) {
-        logger.error('Semantic deduplication failed', err)
+      logger.error('Semantic deduplication failed', err)
     }
 
-    logger.info(`Analysis Finished. Identified ${this.session.duplicates.length} total duplicate clusters.`)
+    logger.info(
+      `Analysis Finished. Identified ${this.session.duplicates.length} total duplicate clusters.`
+    )
   }
 
   // --- Actions ---
@@ -515,18 +551,20 @@ export class ScanService {
     return { success, failures }
   }
 
-  async moveFiles(payload: ActionPayload & { destination: string }): Promise<{ success: string[]; failures: string[] }> {
+  async moveFiles(
+    payload: ActionPayload & { destination: string }
+  ): Promise<{ success: string[]; failures: string[] }> {
     const success: string[] = []
     const failures: string[] = []
-    
+
     // Ensure dest exists
     try {
-        if (!payload.dryRun) {
-            await fs.mkdir(payload.destination, { recursive: true })
-        }
+      if (!payload.dryRun) {
+        await fs.mkdir(payload.destination, { recursive: true })
+      }
     } catch (err) {
-        logger.error(`Failed to create dest dir ${payload.destination}`)
-        return { success: [], failures: payload.fileIds }
+      logger.error(`Failed to create dest dir ${payload.destination}`)
+      return { success: [], failures: payload.fileIds }
     }
 
     for (const id of payload.fileIds) {
@@ -544,17 +582,17 @@ export class ScanService {
 
       try {
         const destPath = path.join(payload.destination, path.basename(file.path))
-        
+
         // Prevent overwrite
         // TODO: Handle overwrite logic or rename strategy
         try {
-            await fs.access(destPath)
-            // If we get here, file exists. Fail for now.
-            logger.warn(`Destination exists for ${file.path}`)
-            failures.push(id)
-            continue
+          await fs.access(destPath)
+          // If we get here, file exists. Fail for now.
+          logger.warn(`Destination exists for ${file.path}`)
+          failures.push(id)
+          continue
         } catch {
-            // File does not exist, proceed
+          // File does not exist, proceed
         }
 
         await fs.rename(file.path, destPath)

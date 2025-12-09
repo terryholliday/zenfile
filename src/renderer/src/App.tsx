@@ -9,20 +9,22 @@ import { ClaritySlider } from './components/ClaritySlider'
 import { useScanStore } from './store/useScanStore'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'organize' | 'chat' | 'settings'>('scan')
-  const scanState = useScanStore(s => s.scanState);
-  const initialize = useScanStore(s => s.initialize);
+  const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'organize' | 'chat' | 'settings'>(
+    'scan'
+  )
+  const scanState = useScanStore((s) => s.scanState)
+  const initialize = useScanStore((s) => s.initialize)
 
   useEffect(() => {
-    initialize();
-  }, []);
+    initialize()
+  }, [])
 
   // Auto-switch to results when done
   useEffect(() => {
     if (scanState === 'COMPLETED') {
-      setActiveTab('results');
+      setActiveTab('results')
     }
-  }, [scanState]);
+  }, [scanState])
 
   return (
     <div className="flex flex-col h-screen font-sans select-none overflow-hidden text-neutral-100">
@@ -32,7 +34,9 @@ function App() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
             <div className="w-3 h-3 bg-white rounded-full opacity-90" />
           </div>
-          <h1 className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">FileZen</h1>
+          <h1 className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+            FileZen
+          </h1>
         </div>
 
         <div className="flex items-center gap-4">
@@ -54,10 +58,10 @@ function App() {
               key={tab}
               onClick={() => setActiveTab(tab as any)}
               className={twMerge(
-                "flex-1 py-1.5 px-3 rounded-lg text-sm font-medium transition-all duration-200",
+                'flex-1 py-1.5 px-3 rounded-lg text-sm font-medium transition-all duration-200',
                 activeTab === tab
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
+                  ? 'bg-white/10 text-white shadow-sm'
+                  : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/5'
               )}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -75,9 +79,7 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'results' && (
-            <ResultsDashboard />
-          )}
+          {activeTab === 'results' && <ResultsDashboard />}
 
           {activeTab === 'organize' && (
             <div className="h-full overflow-hidden">

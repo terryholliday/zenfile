@@ -16,7 +16,20 @@ export enum IpcChannel {
 }
 
 export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED' | 'CANCELLED'
-export type FileTag = 'DUPLICATE' | 'LARGE' | 'STALE' | 'JUNK' | 'EMPTY_FOLDER' | 'INVOICE' | 'CONTRACT' | 'RECEIPT' | 'FINANCIAL' | 'LEGAL' | 'PERSONAL' | 'SCREENSHOT' | 'SENSITIVE'
+export type FileTag =
+  | 'DUPLICATE'
+  | 'LARGE'
+  | 'STALE'
+  | 'JUNK'
+  | 'EMPTY_FOLDER'
+  | 'INVOICE'
+  | 'CONTRACT'
+  | 'RECEIPT'
+  | 'FINANCIAL'
+  | 'LEGAL'
+  | 'PERSONAL'
+  | 'SCREENSHOT'
+  | 'SENSITIVE'
 
 export interface FileNode {
   id: string // UUID

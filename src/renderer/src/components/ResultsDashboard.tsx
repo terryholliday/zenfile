@@ -13,11 +13,14 @@ export function ResultsDashboard() {
   const [selectedCluster, setSelectedCluster] = useState<DuplicateCluster | null>(null)
 
   // Flatten duplicates for the list
-  const duplicateFiles = duplicates.flatMap(c => c.files)
+  const duplicateFiles = duplicates.flatMap((c) => c.files)
 
   const stats = {
     dupCount: duplicates.length,
-    dupSize: duplicates.reduce((acc, c) => acc + (c.files[0]?.sizeBytes || 0) * (c.files.length - 1), 0),
+    dupSize: duplicates.reduce(
+      (acc, c) => acc + (c.files[0]?.sizeBytes || 0) * (c.files.length - 1),
+      0
+    ),
     largeCount: largeFiles.length,
     largeSize: largeFiles.reduce((acc, f) => acc + f.sizeBytes, 0)
   }
@@ -31,22 +34,20 @@ export function ResultsDashboard() {
   }
 
   const handleKeepFile = (fileId: string) => {
-    if (!selectedCluster) return;
+    if (!selectedCluster) return
     // Find all OTHER files in this cluster to trash
-    const filesToTrash = selectedCluster.files
-      .filter(f => f.id !== fileId)
-      .map(f => f.id);
+    const filesToTrash = selectedCluster.files.filter((f) => f.id !== fileId).map((f) => f.id)
 
     if (filesToTrash.length > 0) {
-      actionTrash(filesToTrash);
+      actionTrash(filesToTrash)
     }
-    setSelectedCluster(null);
-  };
+    setSelectedCluster(null)
+  }
 
   const handleFileSelect = (file: FileNode) => {
     if (view === 'duplicates') {
-      const cluster = duplicates.find(c => c.files.some(f => f.id === file.id));
-      if (cluster) setSelectedCluster(cluster);
+      const cluster = duplicates.find((c) => c.files.some((f) => f.id === file.id))
+      if (cluster) setSelectedCluster(cluster)
     }
   }
 

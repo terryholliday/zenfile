@@ -38,7 +38,7 @@ parentPort.on('message', async (command: WorkerCommand) => {
         break
       case WorkerMessageType.CMD_TERMINATE:
         if (ocrWorker) {
-            await ocrWorker.terminate()
+          await ocrWorker.terminate()
         }
         process.exit(0)
         break
@@ -55,26 +55,28 @@ parentPort.on('message', async (command: WorkerCommand) => {
 })
 
 async function handleOcrFile(filePath: string) {
-    try {
-        const worker = await getOcrWorker()
-        const { data: { text } } = await worker.recognize(filePath)
-        
-        const response: WorkerResponse = {
-            type: WorkerMessageType.RES_OCR_RESULT,
-            filePath,
-            text: text.trim().substring(0, 1000) // Limit to 1KB for now
-        }
-        parentPort?.postMessage(response)
-    } catch (err: any) {
-        // OCR might fail on some images, just log error
-        const response: WorkerResponse = {
-            type: WorkerMessageType.RES_ERROR,
-            error: `OCR Failed: ${err.message}`,
-            path: filePath,
-            fatal: false
-        }
-        parentPort?.postMessage(response)
+  try {
+    const worker = await getOcrWorker()
+    const {
+      data: { text }
+    } = await worker.recognize(filePath)
+
+    const response: WorkerResponse = {
+      type: WorkerMessageType.RES_OCR_RESULT,
+      filePath,
+      text: text.trim().substring(0, 1000) // Limit to 1KB for now
     }
+    parentPort?.postMessage(response)
+  } catch (err: any) {
+    // OCR might fail on some images, just log error
+    const response: WorkerResponse = {
+      type: WorkerMessageType.RES_ERROR,
+      error: `OCR Failed: ${err.message}`,
+      path: filePath,
+      fatal: false
+    }
+    parentPort?.postMessage(response)
+  }
 }
 
 async function handleScanDir(dirPath: string) {
