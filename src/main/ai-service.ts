@@ -1,24 +1,27 @@
-import { pipeline, Pipeline } from '@xenova/transformers'
-import { create, insert, search, type Orama } from '@orama/orama'
+import { create, insert, search, load, save, type Orama } from '@orama/orama'
 import { app } from 'electron'
 import path from 'path'
+import fs from 'fs/promises'
+import { Worker } from 'worker_threads'
 import { FileNode } from '../shared/types'
 import { logger } from './logger'
-
-// Type definition for vector storage schema
-interface FileSchema {
-  id: string
-  path: string
-  content: string
-  embedding: number[]
-}
+import type { AiWorkerCommand, AiWorkerResponse } from './ai.worker'
 
 export class AiService {
   private static instance: AiService
-  private model: Pipeline | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private db: Orama<any> | null = null
+  private worker: Worker | null = null
+  private pendingRequests = new Map<
+    string,
+    { resolve: (val: number[]) => void; reject: (err: Error) => void }
+  >()
   private isInitializing = false
 
+  // Cache for deduplication service reuse - prevents redundant computation
+  private embeddingCache = new Map<string, number[]>()
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   private constructor() {}
 
   static getInstance(): AiService {
@@ -28,33 +31,38 @@ export class AiService {
     return AiService.instance
   }
 
-  private summarizer: Pipeline | null = null
-
-  async initialize() {
-    if (this.model && this.db && this.summarizer) return
+  async initialize(): Promise<void> {
+    if (this.worker && this.db) return
     if (this.isInitializing) return
 
     this.isInitializing = true
-    logger.info('Initializing AI Service...')
+    logger.info('Initializing AI Service & Worker...')
 
     try {
-      // 1. Load Embedding Model
-      if (!this.model) {
-        this.model = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-          quantized: true
-        })
+      // 1. Spawn AI Worker (keeps heavy ML off main thread)
+      let workerPath = path.join(__dirname, 'ai.worker.js')
+      if (app.isPackaged) {
+        workerPath = path.join(
+          process.resourcesPath,
+          'app.asar.unpacked',
+          'out',
+          'main',
+          'ai.worker.js'
+        )
       }
 
-      // 2. Load Summarization Model (Lazy load or parallel)
-      // Using DistilBART or T5. DistilBART is faster for summarization.
-      if (!this.summarizer) {
-        this.summarizer = await pipeline('summarization', 'Xenova/distilbart-cnn-6-6', {
-          quantized: true
-        })
-      }
+      this.worker = new Worker(workerPath)
+      this.worker.on('message', (msg: AiWorkerResponse) => this.handleWorkerMessage(msg))
+      this.worker.on('error', (err) => logger.error('AI Worker Error', err))
 
-      // 3. Initialize Vector DB
-      if (!this.db) {
+      // Initialize worker (loads model)
+      this.postToWorker({ type: 'INIT' })
+
+      // 2. Initialize or Load Vector DB from disk
+      const dbPath = path.join(app.getPath('userData'), 'zenfile-vectors.json')
+      try {
+        const data = await fs.readFile(dbPath, 'utf-8')
+        // Create fresh DB schema first
         this.db = await create({
           schema: {
             id: 'string',
@@ -63,44 +71,93 @@ export class AiService {
             embedding: 'vector[384]'
           }
         })
+        // Load persisted data
+        await load(this.db, JSON.parse(data))
+        logger.info('Loaded existing Vector DB from disk')
+      } catch {
+        // Create fresh DB
+        this.db = await create({
+          schema: {
+            id: 'string',
+            path: 'string',
+            content: 'string',
+            embedding: 'vector[384]'
+          }
+        })
+        logger.info('Created fresh Vector DB')
       }
 
       logger.info('AI Service Initialized Successfully')
-    } catch (err: any) {
-      logger.error('Failed to initialize AI Service', { error: err.message })
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      logger.error('Failed to initialize AI Service', { error: errorMsg })
     } finally {
       this.isInitializing = false
     }
   }
 
-  async generateSummary(text: string): Promise<string> {
-    if (!this.summarizer) await this.initialize()
-    if (!this.summarizer) throw new Error('Summarizer model failed to load')
+  // --- Worker Communication ---
 
-    try {
-      // Truncate input if too long (rough char count)
-      const input = text.substring(0, 4000)
-      const result = await this.summarizer(input, {
-        max_new_tokens: 100,
-        min_new_tokens: 20,
-        do_sample: false
-      })
+  private postToWorker(cmd: AiWorkerCommand): void {
+    if (!this.worker) throw new Error('AI Worker not initialized')
+    this.worker.postMessage(cmd)
+  }
 
-      // Result is usually [{ summary_text: "..." }]
-      // @ts-ignore
-      return result[0]?.summary_text || 'No summary generated.'
-    } catch (err: any) {
-      logger.error('Summarization failed', err)
-      return 'Unable to generate summary.'
+  private handleWorkerMessage(msg: AiWorkerResponse): void {
+    switch (msg.type) {
+      case 'INIT_DONE':
+        logger.info('AI Worker initialized and ready')
+        break
+
+      case 'EMBED_RES': {
+        const req = this.pendingRequests.get(msg.id)
+        if (req) {
+          req.resolve(msg.embedding)
+          this.pendingRequests.delete(msg.id)
+        }
+        break
+      }
+
+      case 'SUMMARIZE_RES':
+        // For now, summarization is sync - can extend with request tracking
+        break
+
+      case 'ERROR': {
+        if (msg.id) {
+          const req = this.pendingRequests.get(msg.id)
+          if (req) {
+            req.reject(new Error(msg.error))
+            this.pendingRequests.delete(msg.id)
+          }
+        }
+        logger.error('AI Worker reported error', { error: msg.error })
+        break
+      }
     }
   }
 
-  async generateEmbedding(text: string): Promise<number[]> {
-    if (!this.model) await this.initialize()
-    if (!this.model) throw new Error('AI Model Failed to Load')
+  // --- Public API ---
 
-    const output = await this.model(text, { pooling: 'mean', normalize: true })
-    return Array.from(output.data) // Convert Tensor to simple array
+  async generateEmbedding(text: string, fileId?: string): Promise<number[]> {
+    if (!this.worker) await this.initialize()
+
+    // Check cache first (critical for deduplication efficiency!)
+    if (fileId && this.embeddingCache.has(fileId)) {
+      return this.embeddingCache.get(fileId)!
+    }
+
+    const reqId = fileId || `req_${Date.now()}_${Math.random().toString(36).slice(2)}`
+
+    return new Promise<number[]>((resolve, reject) => {
+      this.pendingRequests.set(reqId, { resolve, reject })
+      this.postToWorker({ type: 'EMBED', id: reqId, text })
+    }).then((vec) => {
+      // Cache the result if we have a file ID
+      if (fileId) {
+        this.embeddingCache.set(fileId, vec)
+      }
+      return vec
+    })
   }
 
   async indexFile(file: FileNode): Promise<void> {
@@ -110,20 +167,21 @@ export class AiService {
     if (!textToEmbed) return
 
     try {
-      const embedding = await this.generateEmbedding(textToEmbed)
+      const embedding = await this.generateEmbedding(textToEmbed, file.id)
 
       await insert(this.db!, {
         id: file.id,
         path: file.path,
-        content: textToEmbed.substring(0, 500), // Store snippet
+        content: textToEmbed.substring(0, 500),
         embedding: embedding
       })
-    } catch (err: any) {
-      logger.error(`Failed to index file ${file.name}`, { error: err.message })
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      logger.error(`Failed to index file ${file.name}`, { error: errorMsg })
     }
   }
 
-  async search(query: string) {
+  async search(query: string): Promise<{ id: string; path: string; score: number }[]> {
     if (!this.db) await this.initialize()
 
     const queryEmbedding = await this.generateEmbedding(query)
@@ -135,15 +193,37 @@ export class AiService {
         value: queryEmbedding,
         property: 'embedding'
       },
-      similarity: 0.7, // Threshold
+      similarity: 0.7,
       limit: 10
     })
 
     return results.hits.map((hit) => ({
-      id: hit.document.id,
-      path: hit.document.path,
+      id: hit.document.id as string,
+      path: hit.document.path as string,
       score: hit.score
     }))
+  }
+
+  // --- Persistence ---
+
+  async saveDb(): Promise<void> {
+    if (!this.db) return
+
+    try {
+      const dbPath = path.join(app.getPath('userData'), 'zenfile-vectors.json')
+      const data = await save(this.db)
+      await fs.writeFile(dbPath, JSON.stringify(data))
+      logger.info('Vector DB saved to disk')
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      logger.error('Failed to save Vector DB', { error: errorMsg })
+    }
+  }
+
+  // Clear cache (useful on new scan)
+  clearCache(): void {
+    this.embeddingCache.clear()
+    logger.info('Embedding cache cleared')
   }
 }
 

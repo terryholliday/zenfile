@@ -142,7 +142,7 @@ export class ScanService {
   private readonly resultFiles: Map<string, FileNode> = new Map()
   private currentSettings: ScanSettings | null = null
   private lastScannedFile = ''
-  
+
   // Live streaming data for UI
   private recentFlaggedFiles: FileNode[] = []
 
@@ -335,23 +335,35 @@ export class ScanService {
 
     if (largeCount > 0) {
       const totalSize = this.session.largeFiles.reduce((sum, f) => sum + f.sizeBytes, 0)
-      insights.push(`📦 Found ${largeCount} large file${largeCount > 1 ? 's' : ''} (${this.formatBytes(totalSize)} total)`)
+      insights.push(
+        `📦 Found ${largeCount} large file${largeCount > 1 ? 's' : ''} (${this.formatBytes(totalSize)} total)`
+      )
     }
 
     if (tagCounts['INVOICE']) {
-      insights.push(`📄 Detected ${tagCounts['INVOICE']} invoice/receipt file${tagCounts['INVOICE'] > 1 ? 's' : ''}`)
+      insights.push(
+        `📄 Detected ${tagCounts['INVOICE']} invoice/receipt file${tagCounts['INVOICE'] > 1 ? 's' : ''}`
+      )
     }
     if (tagCounts['SCREENSHOT']) {
-      insights.push(`📸 Found ${tagCounts['SCREENSHOT']} screenshot${tagCounts['SCREENSHOT'] > 1 ? 's' : ''}`)
+      insights.push(
+        `📸 Found ${tagCounts['SCREENSHOT']} screenshot${tagCounts['SCREENSHOT'] > 1 ? 's' : ''}`
+      )
     }
     if (tagCounts['FINANCIAL']) {
-      insights.push(`💰 Found ${tagCounts['FINANCIAL']} financial document${tagCounts['FINANCIAL'] > 1 ? 's' : ''}`)
+      insights.push(
+        `💰 Found ${tagCounts['FINANCIAL']} financial document${tagCounts['FINANCIAL'] > 1 ? 's' : ''}`
+      )
     }
     if (tagCounts['PERSONAL']) {
-      insights.push(`👤 Detected ${tagCounts['PERSONAL']} personal document${tagCounts['PERSONAL'] > 1 ? 's' : ''}`)
+      insights.push(
+        `👤 Detected ${tagCounts['PERSONAL']} personal document${tagCounts['PERSONAL'] > 1 ? 's' : ''}`
+      )
     }
     if (tagCounts['CONTRACT']) {
-      insights.push(`📝 Found ${tagCounts['CONTRACT']} contract/agreement${tagCounts['CONTRACT'] > 1 ? 's' : ''}`)
+      insights.push(
+        `📝 Found ${tagCounts['CONTRACT']} contract/agreement${tagCounts['CONTRACT'] > 1 ? 's' : ''}`
+      )
     }
 
     if (insights.length === 0 && this.processedFiles > 100) {
@@ -644,6 +656,13 @@ export class ScanService {
     }
 
     await this.buildDuplicateClusters()
+
+    // Persist AI Vector DB to disk
+    try {
+      await aiService.saveDb()
+    } catch (err) {
+      logger.error('Failed to save Vector DB', err)
+    }
 
     logger.info('Scan complete.')
     this.updateState('COMPLETED', true)
