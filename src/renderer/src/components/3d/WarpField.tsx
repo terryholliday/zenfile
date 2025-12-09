@@ -53,8 +53,9 @@ export function WarpField({ isScanning }: WarpFieldProps) {
 
         // 2. Smooth acceleration
         // Idle speed 20 (cruising), Warp speed 150 (very fast)
-        const targetSpeed = isScanning ? 150 : 20
-        currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 3)
+        // Lerp current speed towards target
+        // Use a lower factor (0.5) for gradual acceleration "rev up" feel
+        currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 0.5)
 
         // Animate
         for (let i = 0; i < stars.length; i++) {

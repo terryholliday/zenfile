@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Html, Float } from '@react-three/drei'
+import { OrbitControls, Html, Float, Sparkles } from '@react-three/drei'
 import { useScanStore } from '../store/useScanStore'
 import { FileNode, DuplicateCluster } from '../../../shared/types'
 import * as THREE from 'three'
