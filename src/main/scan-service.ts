@@ -15,11 +15,11 @@ import {
 } from '../shared/types'
 import {
   WorkerMessageType,
-  WorkerCommand,
-  WorkerResponse,
-  ScanResultResponse,
-  HashResultResponse,
-  OcrResultResponse
+  type WorkerCommand,
+  type WorkerResponse,
+  type ScanResultResponse,
+  type HashResultResponse,
+  type OcrResultResponse
 } from '../shared/worker-types'
 import { WORKER_POOL_SIZE } from '../shared/constants'
 import { logger } from './logger'
@@ -76,7 +76,11 @@ const DEFAULT_EXCLUDE_SEGMENTS = new Set<string>([
 interface ScanSettings {
   enableOcr?: boolean
   excludePaths?: string[]
-  // extend as needed
+}
+
+interface ActionResult {
+  success: string[]
+  failures: string[]
 }
 
 // Simple FIFO queue utility for clarity & reuse
@@ -153,7 +157,7 @@ export class ScanService {
 
     logger.info('Starting Scan Session', { paths: payload.paths })
 
-    this.currentSettings = (payload.settings as ScanSettings | undefined) ?? null
+    this.currentSettings = (payload.settings ?? null) as ScanSettings | null
 
     this.session = {
       id: payload.sessionId,
@@ -376,15 +380,15 @@ export class ScanService {
     if (this.isProcessingAi || this.aiQueue.isEmpty) return
 
     this.isProcessingAi = true
-
     try {
       const file = this.aiQueue.dequeue()
       if (file) {
-        await aiService.indexFile(file).catch((err) => logger.error('AI index failed', err))
+        await aiService.indexFile(file).catch((err: unknown) => {
+          logger.error('AI index failed', err)
+        })
       }
     } finally {
       this.isProcessingAi = false
-
       if (!this.aiQueue.isEmpty) {
         setImmediate(() => {
           void this.processAiQueue()
@@ -481,12 +485,19 @@ export class ScanService {
   }
 
   private handleHashResult(res: HashResultResponse): void {
-    const file = this.resultFiles.get(res.id)
-    if (!file) return
+    // We don't have ID in response, so we must lookup by path.
+    // This is O(N) per hash result, but safe given Map iteration is reasonably fast for typical file counts (~10k-100k).
+    // Optimization: If needed, ScanService could maintain a Path->ID map.
+    // For now, simple iteration is robust.
 
-    file.hash = res.hash
-    this.processedHashes++
-    this.updateState('SCANNING')
+    for (const file of this.resultFiles.values()) {
+      if (file.path === res.filePath) {
+        file.hash = res.hash
+        this.processedHashes++
+        this.updateState('SCANNING')
+        return
+      }
+    }
   }
 
   private handleOcrResult(res: OcrResultResponse): void {
@@ -498,7 +509,8 @@ export class ScanService {
       file.metadata = { ...file.metadata, text: res.text }
 
       const newTags = tagEngine.analyze(file)
-      const mergedTags = new Set<string>([...(file.tags ?? []), ...newTags])
+      const mergedTags = new Set(file.tags ?? [])
+      for (const t of newTags) mergedTags.add(t)
       file.tags = Array.from(mergedTags)
 
       // Queue for re-index
@@ -627,7 +639,7 @@ export class ScanService {
   // Actions
   // -----------------
 
-  async moveToTrash(payload: ActionPayload): Promise<{ success: string[]; failures: string[] }> {
+  async moveToTrash(payload: ActionPayload): Promise<ActionResult> {
     const success: string[] = []
     const failures: string[] = []
 
@@ -658,7 +670,7 @@ export class ScanService {
     return { success, failures }
   }
 
-  async quarantine(payload: ActionPayload): Promise<{ success: string[]; failures: string[] }> {
+  async quarantine(payload: ActionPayload): Promise<ActionResult> {
     const success: string[] = []
     const failures: string[] = []
 
@@ -700,7 +712,7 @@ export class ScanService {
 
   async moveFiles(
     payload: ActionPayload & { destination: string }
-  ): Promise<{ success: string[]; failures: string[] }> {
+  ): Promise<ActionResult> {
     const success: string[] = []
     const failures: string[] = []
 

@@ -111,6 +111,7 @@ export interface ScanProgressPayload {
   filesScanned: number
   bytesScanned: number
   currentFile?: string
+  progress: number
 }
 
 export interface ActionPayload {

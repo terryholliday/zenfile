@@ -4,7 +4,14 @@ import { createReadStream } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { createWorker } from 'tesseract.js'
-import { WorkerMessageType, WorkerCommand, WorkerResponse } from '../shared/worker-types'
+import {
+  WorkerMessageType,
+  type WorkerCommand,
+  type WorkerResponse,
+  type ScanResultResponse,
+  type HashResultResponse,
+  type OcrResultResponse
+} from '../shared/worker-types'
 import { FileNode } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -61,7 +68,7 @@ async function handleOcrFile(filePath: string) {
       data: { text }
     } = await worker.recognize(filePath)
 
-    const response: WorkerResponse = {
+    const response: OcrResultResponse = {
       type: WorkerMessageType.RES_OCR_RESULT,
       filePath,
       text: text.trim().substring(0, 1000) // Limit to 1KB for now
@@ -111,7 +118,7 @@ async function handleScanDir(dirPath: string) {
       }
     }
 
-    const response: WorkerResponse = {
+    const response: ScanResultResponse = {
       type: WorkerMessageType.RES_SCAN_RESULT,
       files,
       dirs
@@ -144,7 +151,7 @@ async function handleHashFile(filePath: string) {
 
     stream.on('end', () => {
       const result = hash.digest('hex')
-      const response: WorkerResponse = {
+      const response: HashResultResponse = {
         type: WorkerMessageType.RES_HASH_RESULT,
         filePath,
         hash: result

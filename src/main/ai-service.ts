@@ -103,7 +103,7 @@ export class AiService {
     return Array.from(output.data) // Convert Tensor to simple array
   }
 
-  async indexFile(file: FileNode) {
+  async indexFile(file: FileNode): Promise<void> {
     if (!this.db) await this.initialize()
 
     const textToEmbed = `${file.name} ${file.tags.join(' ')} ${file.metadata?.text || ''}`.trim()
