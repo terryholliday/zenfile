@@ -607,10 +607,7 @@ export class ScanService {
       }
 
       // PERF FIX: Tagging is now done in Worker. 
-      // We only re-tag here if we had some specific Main-process-only logic (none for now).
       // f.tags is already populated by worker.
-
-      // f.tags = tagEngine.analyze(f)
 
       // Track flagged files for live streaming to UI
       if (f.tags.length > 0) {

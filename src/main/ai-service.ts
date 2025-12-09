@@ -57,6 +57,21 @@ export class AiService {
         this.pendingRequests.delete(id)
       }
     } else if (msg.type === 'SUMMARIZE_RES') {
+         // Fix 2: Crash Recovery - restart worker if it crashes
+      this.worker?.on('exit', (code) => { // Added '?' for safety, as worker might be null if already crashed
+        if (code !== 0) {
+          logger.error(`AI Worker crashed with code ${code}. Restarting...`)
+          
+          // CRITICAL FIX: Reject all pending promises so UI doesn't hang
+          for (const [id, req] of this.pendingRequests) {
+              req.reject(new Error(`AI Worker crashed while processing ${id}`))
+          }
+          this.pendingRequests.clear()
+
+          this.worker = null
+          this.initPromise = null // Allow re-initialization
+        }
+      })  
          // Existing summary handling if needed
          this.pendingRequests.forEach((req, key) => {
             if (key.startsWith('sum_')) {

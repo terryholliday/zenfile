@@ -266,8 +266,14 @@ export function ScanDashboard(): JSX.Element {
               <>
                 <button
                   onClick={async () => {
-                    const path = await window.fileZen.openDirectory()
-                    if (path) setIncludePath(path)
+                    try {
+                      console.log('Requesting folder selection...')
+                      const path = await window.fileZen.openDirectory()
+                      console.log('Selected path:', path)
+                      if (path) setIncludePath(path)
+                    } catch (error) {
+                      console.error('Failed to open directory:', error)
+                    }
                   }}
                   className="flex-1 py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >

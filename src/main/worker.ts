@@ -12,8 +12,32 @@ import {
   type HashResultResponse,
   type OcrResultResponse
 } from '../shared/worker-types'
-import { FileNode } from '../shared/types'
+import { FileNode, FileTag } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
+
+// Simple inline Tag Logic (Copy of TagEngine rules to keep worker pure)
+const TAG_RULES = [
+  { tag: 'INVOICE', patterns: [/invoice/i, /bill/i, /receipt/i, /payment/i] },
+  { tag: 'CONTRACT', patterns: [/contract/i, /agreement/i, /nda/i, /terms/i, /sign/i] },
+  { tag: 'FINANCIAL', patterns: [/tax/i, /statement/i, /bank/i, /finance/i, /salary/i] },
+  { tag: 'PERSONAL', patterns: [/passport/i, /resume/i, /cv/i, /id_card/i, /driver/i] },
+  { tag: 'SCREENSHOT', patterns: [/screen/i, /capture/i, /shot/i, /^img_\d{8}/i, /^screenshot/i] }
+]
+
+function analyzeTags(fileName: string, text?: string): FileTag[] {
+  const tags = new Set<string>()
+  const content = `${fileName} ${text || ''}`.toLowerCase()
+
+  for (const rule of TAG_RULES) {
+    for (const pattern of rule.patterns) {
+      if (pattern.test(content)) {
+        tags.add(rule.tag as FileTag)
+        break // Match one pattern per tag is enough
+      }
+    }
+  }
+  return Array.from(tags) as FileTag[]
+}
 
 if (!parentPort) {
   throw new Error('Worker must be spawned with parentPort')
@@ -144,6 +168,9 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
         try {
           const stats = await fs.stat(fullPath)
           
+          // PERF FIX: Compute tags HERE in the worker
+          const tags = analyzeTags(entry.name)
+
           const node: FileNode = {
             id: uuidv4(),
             path: fullPath,
@@ -152,11 +179,10 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
             atimeMs: stats.atimeMs,
             mtimeMs: stats.mtimeMs,
             isDirectory: false,
-            tags: []
+            tags: tags // <--- Pre-calculated tags
           }
 
-          // PERF FIX: Run tagging in Worker, not Main
-          node.tags = tagEngine.analyze(node)
+          // node.tags = tagEngine.analyze(node)
 
           files.push(node)
         } catch {

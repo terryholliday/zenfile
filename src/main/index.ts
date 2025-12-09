@@ -106,6 +106,17 @@ app.whenReady().then(() => {
   })
 })
 
+// LIFECYCLE FIX: Clean up workers on quit
+app.on('before-quit', async () => {
+  logger.info('App stopping, cleaning up services...')
+  
+  // 1. Stop the active scan immediately
+  scanService.cancel()
+  
+  // 2. Save the Vector DB if needed
+  await aiService.saveDb().catch(err => console.error(err))
+})
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
