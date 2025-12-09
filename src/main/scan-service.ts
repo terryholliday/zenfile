@@ -75,6 +75,113 @@ export class ScanService {
     this.updateState('CANCELLED', true)
   }
 
+  private resetState() {
+    this.activeWorkers = 0
+    this.processedFiles = 0
+    this.processedBytes = 0
+    this.processedHashes = 0
+    this.processedOcrDocs = 0
+    this.dirQueue = []
+    this.hashQueue = []
+    this.ocrQueue = []
+    this.resultFiles.clear()
+    this.workerReadyState = new Array(WORKER_POOL_SIZE).fill(false)
+    
+    // Reset Session
+    if (this.session) {
+        this.session.files = []
+        this.session.duplicates = []
+        this.session.largeFiles = []
+    } else {
+        // Create fresh session object if needed - though start() usually relies on existing or passed ID
+        // In this architecture, start() creates the session *ID* via store, but the Service holds state.
+        // We should ensure `this.session` is initialized properly. 
+        // Ideally start() passed the full session structure, but currently it passes paths/settings.
+        // We'll init a basic session struct here if null, but usually it should be set.
+        // Looking at start(), it sets state but doesn't create `this.session` structure explicitly? 
+        // Wait, start in store creates sessionId. The service needs to track it.
+        // Let's assume start() sets `this.session` via `ScanStartPayload` but payload only has sessionId.
+        // We need to init `this.session` in start() or resetState().
+    }
+  }
+
+  private async initializeWorkers() {
+    this.terminateWorkers()
+    const workerScript = path.join(__dirname, '../worker/index.js')
+    
+    logger.info(`Spawning ${WORKER_POOL_SIZE} workers from ${workerScript}`)
+
+    const promises: Promise<void>[] = []
+
+    for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+        promises.push(new Promise((resolve) => {
+            const worker = new Worker(workerScript)
+            
+            worker.on('message', (msg: WorkerResponse) => {
+                if (msg.type === WorkerMessageType.RES_READY) {
+                    this.handleWorkerMessage(i, msg)
+                    resolve()
+                } else {
+                    this.handleWorkerMessage(i, msg)
+                }
+            })
+            
+            worker.on('error', (err) => {
+                logger.error(`Worker ${i} error:`, err)
+            })
+
+            this.workers.push(worker)
+        }))
+    }
+
+    await Promise.all(promises)
+    logger.info('All workers ready')
+  }
+
+  private terminateWorkers() {
+      for (const worker of this.workers) {
+          worker.postMessage({ type: WorkerMessageType.CMD_TERMINATE })
+          // worker.terminate() // Let it exit gracefully if possible, or terminate force
+          void worker.terminate()
+      }
+      this.workers = []
+      this.workerReadyState = []
+  }
+
+  private updateState(state: ScannerState, force = false) {
+      if (!this.session) {
+          // Init session if missing (should be done in start, but safety net)
+          this.session = {
+              id: 'temp', 
+              startTime: Date.now(),
+              state: 'IDLE',
+              files: [],
+              duplicates: [],
+              largeFiles: []
+          }
+      }
+      
+      this.session.state = state
+      
+      const now = Date.now()
+      if (force || now - this.lastUpdate > 200) {
+          this.lastUpdate = now
+          const payload: ScanProgressPayload = {
+              sessionId: this.session.id,
+              state: this.session.state,
+              filesScanned: this.processedFiles,
+              bytesScanned: this.processedBytes,
+              currentFile: this.resultFiles.size > 0 ? Array.from(this.resultFiles.values())[this.resultFiles.size - 1].path : '',
+              progress: 0 // TODO calc progress
+          }
+          
+          // Send to all windows
+          BrowserWindow.getAllWindows().forEach(win => {
+              win.webContents.send(IpcChannel.ScanProgress, payload)
+          })
+      }
+  }
+
   // ...
 
   private processQueue() {
