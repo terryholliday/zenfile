@@ -4,126 +4,123 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 interface WarpFieldProps {
-  isScanning: boolean
+    isScanning: boolean
 }
 
-const STAR_COUNT = 6000
+const PARTICLE_COUNT = 3000
 
-// Helper to generate stars (spherical distribution for radial warp)
-const generateStars = (): {
-  vec: THREE.Vector3
-  initialDistance: number
-  speedMultiplier: number
-  scale: number
-}[] => {
-  const temp: {
+// Helper to generate particles in a "Cloud/Galaxy" distribution
+const generateParticles = (): {
     vec: THREE.Vector3
-    initialDistance: number
+    initialRadius: number
     speedMultiplier: number
     scale: number
-  }[] = []
-  for (let i = 0; i < STAR_COUNT; i++) {
-    // Random point in sphere
-    const vec = new THREE.Vector3(
-      Math.random() - 0.5,
-      Math.random() - 0.5,
-      Math.random() - 0.5
-    ).normalize()
+    phase: number
+}[] => {
+    const temp: {
+        vec: THREE.Vector3
+        initialRadius: number
+        speedMultiplier: number
+        scale: number
+        phase: number
+    }[] = []
 
-    // Spread them out at different initial distances so they don't all start at center
-    const initialDistance = Math.random() * 60 + 10 // Start between 10 and 70 units out
-    const speedMultiplier = Math.random() * 0.5 + 0.5
-    const scale = Math.random() * 0.5 + 0.2
-    temp.push({ vec, initialDistance, speedMultiplier, scale })
-  }
-  return temp
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        // Disc/Galaxy shape with some vertical spread
+        const angle = Math.random() * Math.PI * 2
+        const radius = Math.random() * 60 + 10 // 10 to 70
+        const height = (Math.random() - 0.5) * 20 // -10 to 10
+
+        // Convert to cartesian
+        const x = Math.cos(angle) * radius
+        const z = Math.sin(angle) * radius
+        const y = height
+
+        const vec = new THREE.Vector3(x, y, z)
+
+        const speedMultiplier = Math.random() * 0.5 + 0.1 // Slower speeds
+        const scale = Math.random() * 0.15 + 0.05 // Smaller, dust-like
+        const phase = Math.random() * Math.PI * 2 // Independent oscillation
+
+        temp.push({ vec, initialRadius: radius, speedMultiplier, scale, phase })
+    }
+    return temp
 }
 
 export function WarpField({ isScanning }: WarpFieldProps): JSX.Element {
-  const meshRef = useRef<THREE.InstancedMesh>(null)
-  const currentSpeed = useRef(2) // Radial speed
-  const starsRef = useRef<
-    { vec: THREE.Vector3; currentDistance: number; speedMultiplier: number; scale: number }[]
-  >([])
+    const meshRef = useRef<THREE.InstancedMesh>(null)
+    const timeRef = useRef(0)
 
-  const dummy = useMemo(() => new THREE.Object3D(), [])
+    // Store particle data
+    const particlesRef = useRef<
+        {
+            vec: THREE.Vector3;
+            initialRadius: number;
+            speedMultiplier: number;
+            scale: number;
+            phase: number;
+        }[]
+    >([])
 
-  // Initial placement
-  useLayoutEffect(() => {
-    // Generate and populate ref once
-    const data = generateStars()
-    starsRef.current = data.map((d) => ({
-      ...d,
-      currentDistance: d.initialDistance
-    }))
+    const dummy = useMemo(() => new THREE.Object3D(), [])
 
-    if (!meshRef.current) return
-    starsRef.current.forEach((data, i) => {
-      dummy.position.copy(data.vec).multiplyScalar(data.currentDistance)
-      dummy.scale.set(data.scale, data.scale, data.scale)
-      dummy.updateMatrix()
-      meshRef.current!.setMatrixAt(i, dummy.matrix)
+    useLayoutEffect(() => {
+        particlesRef.current = generateParticles()
+    }, [])
+
+    useFrame((state, delta) => {
+        if (!meshRef.current) return
+
+        // "Zen" time flows slowly, but accelerates slightly during scanning
+        const timeScale = isScanning ? 2.0 : 0.5
+        timeRef.current += delta * timeScale
+
+        const particles = particlesRef.current
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i]
+
+            // Calculate gentle orbit
+            // Angular velocity decreases with radius (Kepler-ish but stylized)
+            const orbitSpeed = (0.2 / (p.initialRadius * 0.1)) * p.speedMultiplier
+            const currentAngle = Math.atan2(p.vec.z, p.vec.x) + timeRef.current * orbitSpeed
+
+            // Add gentle "breathing" or "wave" motion on Y axis
+            const hover = Math.sin(timeRef.current * 0.5 + p.phase) * 1.5
+
+            const x = Math.cos(currentAngle) * p.initialRadius
+            const z = Math.sin(currentAngle) * p.initialRadius
+            const y = p.vec.y + hover
+
+            dummy.position.set(x, y, z)
+
+            // Subtle rotation of the particle itself
+            dummy.rotation.x = timeRef.current * p.speedMultiplier
+            dummy.rotation.y = timeRef.current * p.speedMultiplier * 0.5
+
+            // Pulse scale slightly
+            const pulse = 1 + Math.sin(timeRef.current * 2 + p.phase) * 0.2
+            dummy.scale.set(p.scale * pulse, p.scale * pulse, p.scale * pulse)
+
+            dummy.updateMatrix()
+            meshRef.current.setMatrixAt(i, dummy.matrix)
+        }
+        meshRef.current.instanceMatrix.needsUpdate = true
     })
-    meshRef.current.instanceMatrix.needsUpdate = true
-  }, [dummy])
 
-  useFrame((_state, delta) => {
-    if (!meshRef.current) return
-
-    // Note: No meshRef.current.lookAt(camera)
-    // We want the explosion to be world-space centered
-
-    // 2. Smooth acceleration
-    // Idle speed: slow expansion. Warp speed: fast expansion.
-    const targetSpeed = isScanning ? 40 : 2
-    currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 0.8)
-
-    // Animate
-    const stars = starsRef.current
-    for (let i = 0; i < stars.length; i++) {
-      const star = stars[i]
-
-      // Radial movement: increase distance
-      star.currentDistance += currentSpeed.current * star.speedMultiplier * delta
-
-      // Loop: if too far, reset to near center
-      if (star.currentDistance > 100) {
-        star.currentDistance = Math.random() * 20 + 5 // Reset close to center
-      }
-
-      // Position = vec * distance
-      dummy.position.copy(star.vec).multiplyScalar(star.currentDistance)
-
-      // Orientation: Point OUTWARDS from center to create streaks
-      // lookAt target: position + vec (points away from center)
-      const lookTarget = dummy.position.clone().add(star.vec)
-      dummy.lookAt(lookTarget)
-
-      // Stretch logic
-      // Straighter lines for Star Trek look
-      // Idle: 1.0 (dot). scanning: stretch up to 50x (very long streaks)
-      const stretch = Math.max(1, Math.min(currentSpeed.current * 0.8, 50))
-
-      // Make them thinner (0.2) to look like lines, stretching only on Z
-      dummy.scale.set(star.scale * 0.2, star.scale * 0.2, star.scale * stretch)
-
-      dummy.updateMatrix()
-      meshRef.current.setMatrixAt(i, dummy.matrix)
-    }
-    meshRef.current.instanceMatrix.needsUpdate = true
-  })
-
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, STAR_COUNT]}>
-      {/* Cylinder looks better for streaks? Or highly scaled sphere. Sphere is fine. */}
-      <sphereGeometry args={[0.08, 8, 8]} />
-      <meshBasicMaterial
-        color="#e0f2fe" // Light cyan (Star Trek warp signature)
-        transparent={false} // Performance
-        opacity={1.0}
-        blending={THREE.AdditiveBlending}
-        toneMapped={false}
-      />
-    </instancedMesh>
-  )
+    return (
+        <instancedMesh ref={meshRef} args={[undefined, undefined, PARTICLE_COUNT]}>
+            {/* Tetrahedron for a crystalline dust look, or simple sphere */}
+            <sphereGeometry args={[1, 4, 4]} />
+            <meshStandardMaterial
+                color="#a5b4fc" // Indigo-200, soft calm purple-blue
+                emissive="#818cf8" // Indigo-400
+                emissiveIntensity={0.5}
+                roughness={0.8}
+                metalness={0.2}
+                transparent={true}
+                opacity={0.6}
+                blending={THREE.AdditiveBlending}
+            />
+        </instancedMesh>
+    )
 }
