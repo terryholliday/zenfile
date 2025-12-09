@@ -10,14 +10,14 @@ interface WarpFieldProps {
 const STAR_COUNT = 6000
 
 // Helper to generate stars (spherical distribution for radial warp)
-const generateStars = () => {
+const generateStars = (): { vec: THREE.Vector3; initialDistance: number; speedMultiplier: number; scale: number }[] => {
     const temp: { vec: THREE.Vector3; initialDistance: number; speedMultiplier: number; scale: number }[] = []
     for (let i = 0; i < STAR_COUNT; i++) {
         // Random point in sphere
         const vec = new THREE.Vector3(
-            (Math.random() - 0.5),
-            (Math.random() - 0.5),
-            (Math.random() - 0.5)
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
         ).normalize()
 
         // Spread them out at different initial distances so they don't all start at center
@@ -29,42 +29,36 @@ const generateStars = () => {
     return temp
 }
 
-export function WarpField({ isScanning }: WarpFieldProps) {
+export function WarpField({ isScanning }: WarpFieldProps): JSX.Element {
     const meshRef = useRef<THREE.InstancedMesh>(null)
     const currentSpeed = useRef(2) // Radial speed
 
-    // Store stars in a ref so we can mutate them without React State issues
-    const starsRef = useRef<{ vec: THREE.Vector3; currentDistance: number; speedMultiplier: number; scale: number }[]>([])
-    const [ready, setReady] = useState(false)
-
-    // Generate stars once on mount
-    useLayoutEffect(() => {
+    // Initialize stars directly in useMemo to avoid effect/state dance
+    // We map them to include mutable currentDistance
+    const stars = useMemo(() => {
         const data = generateStars()
-        // Initialize current distance
-        starsRef.current = data.map((d) => ({
+        return data.map((d) => ({
             ...d,
             currentDistance: d.initialDistance
         }))
-        setReady(true)
     }, [])
 
     const dummy = useMemo(() => new THREE.Object3D(), [])
 
-    // Initial placement (only after stars are ready)
+    // Initial placement
     useLayoutEffect(() => {
-        if (!meshRef.current || !ready) return
-
-        starsRef.current.forEach((data, i) => {
+        if (!meshRef.current) return
+        stars.forEach((data, i) => {
             dummy.position.copy(data.vec).multiplyScalar(data.currentDistance)
             dummy.scale.set(data.scale, data.scale, data.scale)
             dummy.updateMatrix()
             meshRef.current!.setMatrixAt(i, dummy.matrix)
         })
         meshRef.current.instanceMatrix.needsUpdate = true
-    }, [dummy, ready])
+    }, [dummy, stars])
 
-    useFrame((state, delta) => {
-        if (!meshRef.current || !ready) return
+    useFrame((_state, delta) => {
+        if (!meshRef.current) return
 
         // Note: No meshRef.current.lookAt(camera)
         // We want the explosion to be world-space centered
@@ -75,7 +69,6 @@ export function WarpField({ isScanning }: WarpFieldProps) {
         currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 0.8)
 
         // Animate
-        const stars = starsRef.current
         for (let i = 0; i < stars.length; i++) {
             const star = stars[i]
 
