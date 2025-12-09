@@ -62,12 +62,20 @@ declare global {
     }
 }
 
-export function TidalWave() {
+export function TidalWave({ isActive = false, speed = 0.5 }: { isActive?: boolean; speed?: number }) {
     const materialRef = useRef<any>()
 
     useFrame((state, delta) => {
         if (materialRef.current) {
-            materialRef.current.uTime += delta
+            // Only animate time if active
+            if (isActive) {
+                materialRef.current.uTime += delta * speed
+                // Fade in
+                materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0.4, delta * 2)
+            } else {
+                // Fade out
+                materialRef.current.uOpacity = THREE.MathUtils.lerp(materialRef.current.uOpacity, 0, delta * 2)
+            }
         }
     })
 
@@ -80,6 +88,7 @@ export function TidalWave() {
                 transparent
                 depthWrite={false}
                 blending={THREE.AdditiveBlending}
+                uOpacity={0} // Start invisible
             />
         </mesh>
     )

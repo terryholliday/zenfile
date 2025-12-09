@@ -16,39 +16,9 @@ const ZEN_QUOTES = [
   'Digital minimalism is about focusing on what truly matters.'
 ];
 
-// --- Galaxy Builder Component ---
-function ScanGalaxy({ fileCount }: { fileCount: number }) {
-  // Clamp max stars to avoid GPU melting, but allow enough to look cool
-  const starCount = Math.min(Math.max(fileCount, 100), 5000);
+import { ZenGalaxy } from './ZenGalaxy'
 
-  // Dynamic color based on count (starts blue, turns gold/white)
-  const color = fileCount > 1000 ? '#ffaa00' : '#4f46e5';
-
-  return (
-    <group>
-      {/* Base Starfield */}
-      <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
-
-      {/* Dynamic "Files" as Sparkles */}
-      <Sparkles
-        count={starCount}
-        scale={40}
-        size={3}
-        speed={0.4}
-        opacity={0.8}
-        color={color}
-      />
-
-      {/* Core Galaxy Glow */}
-      <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-        <mesh>
-          <sphereGeometry args={[1, 32, 32]} />
-          <meshBasicMaterial color={color} transparent opacity={0.1} />
-        </mesh>
-      </Float>
-    </group>
-  )
-}
+// ... existing imports ...
 
 export function ScanDashboard() {
   const {
@@ -73,7 +43,7 @@ export function ScanDashboard() {
     if (!isScanning) return;
     const interval = setInterval(() => {
       setQuote(ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)]);
-    }, 8000); // Slower quote rotation for more zen
+    }, 8000); 
     return () => clearInterval(interval);
   }, [isScanning]);
 
@@ -86,198 +56,145 @@ export function ScanDashboard() {
   }
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-[400px] w-full h-full overflow-hidden">
-
-      {/* 🌌 Galaxy Builder Background */}
-      <div className="absolute inset-0 z-0">
-        <Canvas camera={{ position: [0, 0, 20], fov: 60 }}>
-          <color attach="background" args={['#050510']} />
-          <fog attach="fog" args={['#050510', 10, 50]} />
-          <ambientLight intensity={0.5} />
-
-          <Suspense fallback={null}>
-            <ScanGalaxy fileCount={filesScanned} />
-          </Suspense>
-        </Canvas>
-        {/* Vignette Overlay for readability */}
-        <div className="absolute inset-0 bg-radial-gradient-strong pointer-events-none" />
+    <div className="relative flex flex-col items-center justify-center min-h-[400px] w-full h-full overflow-hidden bg-[#050510]">
+      
+      {/* 🌌 Premium 3D Background */}
+      <div className="absolute inset-0 z-0 opacity-80">
+         <ZenGalaxy />
       </div>
 
-      {/* Main Content (Z-Index to sit above canvas) */}
-      <div className="z-10 flex flex-col items-center justify-center space-y-8 w-full max-w-2xl mx-auto p-4">
-        {/* Progress Ring / Status Indicator */}
-        <div className="relative w-60 h-60 flex items-center justify-center">
-          {/* Background Ring */}
-          <div className="absolute inset-0 rounded-full border-4 border-white/5" />
+      {/* Vignette & texture overlay for depth */}
+      <div className="absolute inset-0 z-0 bg-radial-gradient-strong pointer-events-none" />
+      
+      {/* Main Content */}
+      <div className="z-10 flex flex-col items-center justify-center space-y-12 w-full max-w-4xl mx-auto p-8">
+        
+        {/* Status Hub */}
+        <div className="relative group">
+            {/* Animated Glow Behind */}
+            <div className={clsx(
+                "absolute -inset-4 rounded-full blur-2xl transition-all duration-1000",
+                isScanning ? "bg-indigo-500/30 animate-pulse" : "bg-white/5"
+            )} />
+            
+            <div className="relative w-72 h-72 flex items-center justify-center">
+                {/* Outer Rotating Ring */}
+                <motion.div 
+                    className={clsx("absolute inset-0 rounded-full border border-indigo-500/30 border-t-indigo-400", isScanning && "shadow-[0_0_30px_rgba(99,102,241,0.3)]")}
+                    animate={isScanning ? { rotate: 360 } : { rotate: 0 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                />
+                
+                {/* Inner Counter-Rotating Ring */}
+                <motion.div 
+                    className="absolute inset-4 rounded-full border border-white/10 border-b-white/50"
+                    animate={isScanning ? { rotate: -360 } : { rotate: 0 }}
+                    transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+                />
 
-          {/* Animated Ring (Breathing Effect) */}
-          <motion.div
-            className={clsx(
-              'absolute inset-0 rounded-full border-4 border-indigo-400 blur-sm',
-              isScanning ? 'opacity-100' : 'opacity-0'
-            )}
-            animate={isScanning ? {
-              rotate: 360,
-              scale: [1, 1.05, 1],
-            } : { rotate: 0, scale: 1 }}
-            transition={{
-              rotate: { duration: 8, repeat: Infinity, ease: 'linear' },
-              scale: { duration: 4, repeat: Infinity, ease: 'easeInOut' }
-            }}
-            style={{
-              borderRightColor: 'transparent',
-              borderBottomColor: 'transparent',
-              borderLeftColor: 'transparent'
-            }}
-          />
-          <motion.div
-            className={clsx(
-              'absolute inset-0 rounded-full border-4 border-white',
-              isScanning ? 'opacity-100' : 'opacity-0'
-            )}
-            animate={isScanning ? { rotate: -360 } : { rotate: 0 }}
-            transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
-            style={{
-              borderRightColor: 'transparent',
-              borderBottomColor: 'transparent'
-            }}
-          />
-
-          {/* Center Content */}
-          <div className="text-center z-10 p-6 glass-panel rounded-full w-40 h-40 flex flex-col items-center justify-center backdrop-blur-3xl shadow-2xl border-white/10">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              key={scanState}
-              className="flex flex-col items-center"
-            >
-              <h3 className="text-2xl font-black text-white tracking-tighter drop-shadow-lg">
-                {scanState === 'IDLE'
-                  ? 'READY'
-                  : scanState === 'SCANNING'
-                    ? 'ZEN MODE'
-                    : scanState === 'COMPLETED'
-                      ? 'DONE'
-                      : scanState}
-              </h3>
-              <p className="text-indigo-200 text-[10px] mt-1 uppercase tracking-widest font-bold">
-                {scanState === 'SCANNING'
-                  ? 'Harmonizing'
-                  : 'System Idle'}
-              </p>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Zen Quote - Larger and simpler */}
-        <AnimatePresence>
-          {isScanning && (
-            <motion.div
-              key={quote}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="h-20 flex items-center justify-center text-center max-w-lg px-4"
-            >
-              <p className="text-xl md:text-2xl text-indigo-100 font-light leading-relaxed drop-shadow-md">&quot;{quote}&quot;</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4 w-full">
-          <div className="p-5 glass-panel rounded-2xl text-center hover:bg-white/10 transition-colors backdrop-blur-md">
-            <div className="text-xs text-neutral-400 uppercase tracking-wider font-bold mb-1">Files Scanned</div>
-            <div className="text-3xl font-mono text-white tracking-tight">{filesScanned.toLocaleString()}</div>
-          </div>
-          <div className="p-5 glass-panel rounded-2xl text-center hover:bg-white/10 transition-colors backdrop-blur-md">
-            <div className="text-xs text-neutral-400 uppercase tracking-wider font-bold mb-1">Data Processed</div>
-            <div className="text-3xl font-mono text-indigo-300 tracking-tight">{formatBytes(bytesScanned)}</div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex flex-col items-center gap-6 w-full">
-          {isIdle && (
-            <div className="flex items-center gap-4 w-full p-2 pl-4 pr-2 rounded-xl glass-panel group hover:border-white/20 transition-all backdrop-blur-md">
-              <div className="flex-1 truncate text-left">
-                <div className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold mb-0.5">
-                  Target Directory
+                {/* Glass Core */}
+                <div className="w-56 h-56 rounded-full glass-panel flex flex-col items-center justify-center backdrop-blur-2xl border border-white/10 shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                    
+                    <motion.div
+                        key={scanState}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center z-10"
+                    >
+                         <h2 className="text-4xl font-black text-white tracking-tighter drop-shadow-glow">
+                            {scanState === 'IDLE' ? 'READY' : 
+                             scanState === 'SCANNING' ? 'ZEN' :
+                             scanState === 'COMPLETED' ? 'DONE' : scanState}
+                        </h2>
+                        <p className="text-indigo-200 text-xs font-bold tracking-[0.2em] uppercase mt-2">
+                            {scanState === 'SCANNING' ? 'HARMONIZING' : 'AWAITING INPUT'}
+                        </p>
+                    </motion.div>
                 </div>
-                <div
-                  className="text-neutral-200 text-sm truncate font-mono group-hover:text-white transition-colors"
-                  title={settings?.includePaths[0]}
-                >
-                  {settings?.includePaths[0] || 'No directory selected'}
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  const path = await window.fileZen.openDirectory()
-                  if (path) setIncludePath(path)
-                }}
-                className="px-4 py-2 text-xs font-bold bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/5 hover:border-white/20 transition-all"
-              >
-                CHANGE
-              </button>
             </div>
-          )}
+        </div>
 
-          <div className="w-full">
-            {isIdle ? (
-              <button
-                onClick={async () => {
-                  const hasPath = settings?.includePaths && settings.includePaths.length > 0
-                  if (hasPath) {
-                    startScan(settings.includePaths)
-                  } else {
-                    const path = await window.fileZen.openDirectory()
-                    if (path) setIncludePath(path)
-                  }
-                }}
-                className="w-full py-4 bg-white text-black hover:bg-indigo-50 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
-              >
-                {settings?.includePaths && settings.includePaths.length > 0 ? 'Start Zen Scan' : 'Select Directory to Scan'}
-              </button>
-            ) : (
-              <button
-                onClick={() => cancelScan()}
-                className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/50 text-red-200 rounded-xl font-bold text-lg transition-all active:scale-[0.98] backdrop-blur-md"
-                disabled={scanState === 'CANCELLING'}
-              >
-                {scanState === 'CANCELLING' ? 'Stopping...' : 'Stop Scan'}
-              </button>
-            )}
-          </div>
+        {/* Stats Grid - Floating Cards */}
+        <div className="grid grid-cols-2 gap-6 w-full max-w-lg">
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col items-center group hover:bg-white/10 transition-colors">
+                <span className="text-xs text-indigo-300 font-bold tracking-wider mb-2 uppercase">Files Scanned</span>
+                <span className="text-3xl font-mono text-white tracking-tight group-hover:scale-110 transition-transform">
+                    {filesScanned.toLocaleString()}
+                </span>
+            </div>
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col items-center group hover:bg-white/10 transition-colors">
+                <span className="text-xs text-emerald-300 font-bold tracking-wider mb-2 uppercase">Data Size</span>
+                <span className="text-3xl font-mono text-white tracking-tight group-hover:scale-110 transition-transform">
+                    {formatBytes(bytesScanned)}
+                </span>
+            </div>
+        </div>
 
-          {/* Live Scan Results & Stats */}
-          {isScanning && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-xl flex flex-col gap-4"
-            >
-              {/* Current File - Full Path */}
-              <div className="w-full text-center p-3 rounded-xl bg-black/40 border border-white/5 shadow-inner backdrop-blur-sm">
-                <div className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-1">Scanning</div>
-                <div className="text-indigo-200 font-mono text-xs break-all leading-relaxed">
-                  {currentFile}
-                </div>
-              </div>
+        {/* Dynamic Quote Area */}
+        <div className="h-16 flex items-center justify-center">
+            <AnimatePresence mode='wait'>
+                {isScanning && (
+                    <motion.p 
+                        key={quote}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="text-lg text-indigo-100/80 font-light italic text-center max-w-xl"
+                    >
+                        "{quote}"
+                    </motion.p>
+                )}
+            </AnimatePresence>
+        </div>
 
-              {/* Live Findings Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col items-center backdrop-blur-sm">
-                  <div className="text-2xl font-bold text-red-400">{duplicates.length}</div>
-                  <div className="text-[10px] text-red-300/70 uppercase tracking-wider">Duplicate Groups</div>
+        {/* Action Bar */}
+        <div className="w-full max-w-lg space-y-4">
+             {isScanning && (
+                <div className="w-full p-4 rounded-xl bg-black/40 border border-white/5 backdrop-blur-md overflow-hidden relative">
+                    <div className="absolute top-0 left-0 h-0.5 bg-indigo-500 animate-pulse w-full opacity-50"/>
+                    <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+                        <span className="text-xs font-mono text-indigo-200 truncate flex-1 opacity-70">
+                            {currentFile || 'Initializing...'}
+                        </span>
+                    </div>
                 </div>
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex flex-col items-center backdrop-blur-sm">
-                  <div className="text-2xl font-bold text-amber-400">{largeFiles.length}</div>
-                  <div className="text-[10px] text-amber-300/70 uppercase tracking-wider">Large Files</div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+             )}
+
+            <div className="flex gap-4">
+                {isIdle ? (
+                    <>
+                        <button 
+                            onClick={async () => {
+                                const path = await window.fileZen.openDirectory()
+                                if (path) setIncludePath(path)
+                            }}
+                            className="flex-1 py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <span className="block text-xs text-neutral-400 font-normal mb-1">SCAN TARGET</span>
+                            <span className="block truncate px-4">{settings?.includePaths[0] ? settings.includePaths[0].split(settings.includePaths[0].includes('\\') ? '\\' : '/').pop() : 'Select Folder'}</span>
+                        </button>
+                        
+                        <button 
+                            onClick={() => {
+                                if (settings?.includePaths?.length) startScan(settings.includePaths)
+                                else window.fileZen.openDirectory().then(p => p && setIncludePath(p))
+                            }}
+                            className="flex-[2] py-4 rounded-xl bg-white text-black font-black text-lg hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            INITIATE SCAN
+                        </button>
+                    </>
+                ) : (
+                    <button 
+                        onClick={() => cancelScan()}
+                        className="w-full py-5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-200 font-bold hover:bg-red-500/20 transition-all"
+                    >
+                        ABORT SEQUENCE
+                    </button>
+                )}
+            </div>
         </div>
       </div>
     </div>
