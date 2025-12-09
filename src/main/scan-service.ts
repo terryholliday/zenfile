@@ -484,33 +484,55 @@ export class ScanService {
   // AI Queue Handling
   // -----------------
 
-  private async processAiQueue(): Promise<void> {
-    if (this.isProcessingAi || this.aiQueue.isEmpty) return
+  // -----------------
+  // AI Queue Handling
+  // -----------------
+  
+  // Use a promise to track queue draining
+  private aiQueuePromise: Promise<void> | null = null
+  private aiResolve: (() => void) | null = null
 
-    this.isProcessingAi = true
-    try {
-      const file = this.aiQueue.dequeue()
-      if (file) {
-        await aiService.indexFile(file).catch((err: unknown) => {
-          logger.error('AI index failed', err)
-        })
+  private startAiQueueProcessor() {
+      if (this.isProcessingAi) return
+      this.isProcessingAi = true
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.processAiQueueLoop()
+  }
 
-        // FIX: MEMORY LEAK PREVENTION
-        // Once indexed, we don't need the heavy OCR text in main process memory.
-        // The Vector DB now owns the semantic representation.
-        // We keep tags and basic metadata, but dump the raw 'text' string.
-        if (file.metadata?.text) {
-          delete file.metadata.text
-        }
+  private async processAiQueueLoop() {
+      while (!this.aiQueue.isEmpty) {
+          const file = this.aiQueue.dequeue()
+          if (file) {
+              try {
+                  await aiService.indexFile(file)
+                  if (file.metadata?.text) delete file.metadata.text // Memory cleanup
+              } catch (e) { logger.error('AI index error', e) }
+          }
+          // Optional: Yield to event loop
+          await new Promise(r => setImmediate(r))
       }
-    } finally {
+      
       this.isProcessingAi = false
-      if (!this.aiQueue.isEmpty) {
-        setImmediate(() => {
-          void this.processAiQueue()
-        })
+      // Signal completion if anyone is waiting
+      if (this.aiResolve) {
+          this.aiResolve()
+          this.aiResolve = null
+          this.aiQueuePromise = null
       }
-    }
+  }
+  
+  // Call this when adding items
+  private enqueueAi(file: FileNode) {
+      this.aiQueue.enqueue(file)
+      this.startAiQueueProcessor()
+  }
+
+  private async waitForAiDrain(): Promise<void> {
+      if (this.aiQueue.isEmpty && !this.isProcessingAi) return
+      if (!this.aiQueuePromise) {
+          this.aiQueuePromise = new Promise(resolve => { this.aiResolve = resolve })
+      }
+      return this.aiQueuePromise
   }
 
   // -----------------
@@ -602,7 +624,9 @@ export class ScanService {
       const ext = path.extname(f.name).toLowerCase()
 
       if (AI_INDEXABLE_EXTENSIONS.has(ext)) {
-        this.aiQueue.enqueue(f)
+      if (AI_INDEXABLE_EXTENSIONS.has(ext)) {
+        this.enqueueAi(f)
+      }
       }
 
       if (this.currentSettings?.enableOcr && OCR_IMAGE_EXTENSIONS.has(ext)) {
@@ -638,7 +662,7 @@ export class ScanService {
     file.tags = Array.from(mergedTags)
 
     // Queue for re-index
-    this.aiQueue.enqueue(file)
+    this.enqueueAi(file)
 
     this.processedOcrDocs++
     this.updateState('SCANNING')
@@ -690,7 +714,11 @@ export class ScanService {
 
     await this.buildDuplicateClusters()
 
-    // Persist AI Vector DB to disk
+    // 3. Wait for AI to finish indexing BEFORE saving
+    logger.info('Waiting for AI indexing to finish...')
+    await this.waitForAiDrain()
+
+    // 4. Save DB
     try {
       await aiService.saveDb()
     } catch (err) {
@@ -703,9 +731,6 @@ export class ScanService {
     logger.info('Scan complete.')
     this.updateState('COMPLETED', true)
     this.terminateWorkers()
-
-    // Phase 3: Let AI queue drain in background
-    void this.processAiQueue()
   }
 
   private identifyHashCandidates(): FileNode[] {
