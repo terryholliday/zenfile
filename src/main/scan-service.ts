@@ -107,7 +107,8 @@ export class ScanService {
 
   private async initializeWorkers() {
     this.terminateWorkers()
-    const workerScript = path.join(__dirname, '../worker/index.js')
+    // In production/dev with electron-vite, worker.js is a sibling of index.js (where this code effectively runs)
+    const workerScript = path.join(__dirname, 'worker.js')
     
     logger.info(`Spawning ${WORKER_POOL_SIZE} workers from ${workerScript}`)
 
