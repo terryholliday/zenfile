@@ -1,31 +1,36 @@
 import { parentPort } from 'worker_threads'
 import { pipeline } from '@xenova/transformers'
 
-// Define explicit message types for the AI worker
 export type AiWorkerCommand =
   | { type: 'INIT' }
   | { type: 'EMBED'; id: string; text: string }
-  | { type: 'SUMMARIZE'; text: string }
+  | { type: 'SUMMARIZE'; id: string; text: string }
+  | { type: 'CLUSTER'; items: { id: string; vec: number[] }[]; threshold: number }
 
 export type AiWorkerResponse =
   | { type: 'INIT_DONE' }
   | { type: 'EMBED_RES'; id: string; embedding: number[] }
-  | { type: 'SUMMARIZE_RES'; summary: string }
+  | { type: 'SUMMARIZE_RES'; id: string; summary: string }
+  | { type: 'CLUSTER_RES'; clusters: string[][] }
   | { type: 'ERROR'; error: string; id?: string }
 
 if (!parentPort) throw new Error('Must be run as a worker')
 
-// Use `any` for pipeline instances since types are complex
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let embedder: any = null
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let summarizer: any = null
 
+function dotProduct(a: number[], b: number[]): number {
+  let sum = 0
+  for (let i = 0; i < a.length; i++) sum += a[i] * b[i]
+  return sum
+}
+
 parentPort.on('message', async (cmd: AiWorkerCommand) => {
   try {
     switch (cmd.type) {
       case 'INIT':
-        // Load embedder model (summarizer loaded lazily)
         if (!embedder) {
           embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
             quantized: true
@@ -57,8 +62,33 @@ parentPort.on('message', async (cmd: AiWorkerCommand) => {
           do_sample: false
         })
         const summary = (result as { summary_text?: string }[])[0]?.summary_text || 'No summary.'
-        parentPort?.postMessage({ type: 'SUMMARIZE_RES', summary })
+        parentPort?.postMessage({ type: 'SUMMARIZE_RES', id: cmd.id, summary })
         break
+
+      case 'CLUSTER': {
+        const { items, threshold } = cmd
+        const clusters: string[][] = []
+        // Simple greedy clustering assuming normalized vectors
+        const clusterReps: number[][] = []
+
+        for (const item of items) {
+          let found = false
+          for (let i = 0; i < clusterReps.length; i++) {
+            const sim = dotProduct(item.vec, clusterReps[i])
+            if (sim >= threshold) {
+              clusters[i].push(item.id)
+              found = true
+              break
+            }
+          }
+          if (!found) {
+            clusters.push([item.id])
+            clusterReps.push(item.vec)
+          }
+        }
+        parentPort?.postMessage({ type: 'CLUSTER_RES', clusters })
+        break
+      }
     }
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err)

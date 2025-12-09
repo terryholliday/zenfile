@@ -1,5 +1,4 @@
 import { FileNode, FileTag } from '../shared/types'
-import path from 'path'
 
 interface TagRule {
   tag: FileTag

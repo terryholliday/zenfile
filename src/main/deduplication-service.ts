@@ -73,32 +73,36 @@ export class DeduplicationService {
     // 1. Generate Embeddings (Batched)
     const embeddings: { id: string; vec: number[] }[] = []
     const BATCH_SIZE = 5
-    
+
     for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-        // Yield to event loop every few batches to keep UI responsive
-        if (i % 20 === 0) await new Promise(r => setImmediate(r))
-        
-        const batch = candidates.slice(i, i + BATCH_SIZE)
-        await Promise.all(batch.map(async (file) => {
-            try {
-                let content: string | null = null
-                const ext = file.name.split('.').pop()?.toLowerCase() || ''
+      // Yield to event loop every few batches to keep UI responsive
+      if (i % 20 === 0) await new Promise((r) => setImmediate(r))
 
-                if (PLAINTEXT_EXTENSIONS.has(ext)) {
-                    content = await fs.readFile(file.path, 'utf-8')
-                } else if (file.metadata?.text) {
-                    content = file.metadata.text
-                }
+      const batch = candidates.slice(i, i + BATCH_SIZE)
+      await Promise.all(
+        batch.map(async (file) => {
+          try {
+            let content: string | null = null
+            const ext = file.name.split('.').pop()?.toLowerCase() || ''
 
-                if (!content) return
+            if (PLAINTEXT_EXTENSIONS.has(ext)) {
+              content = await fs.readFile(file.path, 'utf-8')
+            } else if (file.metadata?.text) {
+              content = file.metadata.text
+            }
 
-                const snippet = content.substring(0, 1000)
-                if (!snippet.trim()) return
+            if (!content) return
 
-                const vec = await aiService.generateEmbedding(snippet, file.id)
-                embeddings.push({ id: file.id, vec })
-            } catch (err) { /* ignore */ }
-        }))
+            const snippet = content.substring(0, 1000)
+            if (!snippet.trim()) return
+
+            const vec = await aiService.generateEmbedding(snippet, file.id)
+            embeddings.push({ id: file.id, vec })
+          } catch (err) {
+            /* ignore */
+          }
+        })
+      )
     }
 
     // 2. Compare Vectors (O(N^2))
@@ -107,7 +111,7 @@ export class DeduplicationService {
 
     for (let i = 0; i < embeddings.length; i++) {
       // RESPONSIVENESS FIX: Yield every 50 iterations to prevent freezing
-      if (i % 50 === 0) await new Promise(resolve => setImmediate(resolve))
+      if (i % 50 === 0) await new Promise((resolve) => setImmediate(resolve))
 
       if (visited.has(embeddings[i].id)) continue
 
@@ -126,10 +130,10 @@ export class DeduplicationService {
       }
 
       if (currentCluster.length > 1) {
-        clusters.push({ 
-            hash: `semantic-${Date.now()}-${i}`, 
-            files: currentCluster, 
-            type: 'SEMANTIC' 
+        clusters.push({
+          hash: `semantic-${Date.now()}-${i}`,
+          files: currentCluster,
+          type: 'SEMANTIC'
         })
       }
     }

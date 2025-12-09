@@ -25,7 +25,26 @@ class DnaService {
         (f) => !f.startsWith('.') && !f.startsWith('node_modules') && f !== 'README.md'
       )
 
-      const SAFE_EXTS = new Set(['.txt', '.md', '.ts', '.tsx', '.js', '.jsx', '.json', '.py', '.java', '.c', '.cpp', '.h', '.css', '.html', '.css', '.scss', '.yaml', '.yml'])
+      const SAFE_EXTS = new Set([
+        '.txt',
+        '.md',
+        '.ts',
+        '.tsx',
+        '.js',
+        '.jsx',
+        '.json',
+        '.py',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
+        '.css',
+        '.html',
+        '.css',
+        '.scss',
+        '.yaml',
+        '.yml'
+      ])
       const MAX_TOTAL_CHARS = 15000 // Hard cap to prevent OOM / Token overload
 
       // 2. Parallel Read with Cap
@@ -34,34 +53,36 @@ class DnaService {
 
       // Read files in parallel batches to speed up IO without opening 1000s of handles
       const BATCH_SIZE = 10
-      
+
       for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
         if (totalChars >= MAX_TOTAL_CHARS) break
 
         const batch = candidates.slice(i, i + BATCH_SIZE)
-        
-        await Promise.all(batch.map(async (file) => {
+
+        await Promise.all(
+          batch.map(async (file) => {
             if (totalChars >= MAX_TOTAL_CHARS) return
 
             const filePath = path.join(folderPath, file)
             try {
-                const stats = await fs.stat(filePath)
-                if (stats.isDirectory() || stats.size > 100 * 1024) return // Skip dirs and large files (>100kb)
+              const stats = await fs.stat(filePath)
+              if (stats.isDirectory() || stats.size > 100 * 1024) return // Skip dirs and large files (>100kb)
 
-                const ext = path.extname(file).toLowerCase()
-                if (SAFE_EXTS.has(ext)) {
-                    const content = await fs.readFile(filePath, 'utf-8')
-                    const snippet = `\n--- FILE: ${file} ---\n${content.substring(0, 500)}\n`
-                    
-                    if (totalChars + snippet.length < MAX_TOTAL_CHARS) {
-                        snippets.push(snippet)
-                        totalChars += snippet.length
-                    }
+              const ext = path.extname(file).toLowerCase()
+              if (SAFE_EXTS.has(ext)) {
+                const content = await fs.readFile(filePath, 'utf-8')
+                const snippet = `\n--- FILE: ${file} ---\n${content.substring(0, 500)}\n`
+
+                if (totalChars + snippet.length < MAX_TOTAL_CHARS) {
+                  snippets.push(snippet)
+                  totalChars += snippet.length
                 }
+              }
             } catch (e) {
-                // Ignore read errors
+              // Ignore read errors
             }
-        }))
+          })
+        )
       }
 
       const context = snippets.join('')
@@ -70,7 +91,7 @@ class DnaService {
 
       // 3. Generate Summary
       const prompt = `Summarize this project based on these file snippets. Create a brief README intro:\n${context}`
-      
+
       // Ensure aiService.generateSummary exists (restored above)
       const summary = await aiService.generateSummary(prompt)
 

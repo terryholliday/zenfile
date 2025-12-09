@@ -20,21 +20,19 @@ interface ScanStoreState {
   largeFiles: FileNode[]
   files: FileNode[]
 
-  // Live streaming during scan
   liveLargeFiles: FileNode[]
   liveFlaggedFiles: FileNode[]
   liveInsight: string
 
-  // Settings Cache
   settings: SettingsSchema | null
 
-  // Actions
+  // FIX: Explicit Promise return types
   initialize: () => Promise<void>
   startScan: (paths: string[]) => Promise<void>
   cancelScan: () => void
   updateProgress: (payload: ScanProgressPayload) => void
   setIncludePath: (path: string) => void
-  updateSettings: (settings: Partial<SettingsSchema>) => void
+  updateSettings: (settings: Partial<SettingsSchema>) => Promise<void>
 
   loadResults: () => Promise<void>
   actionTrash: (fileIds: string[]) => Promise<void>
@@ -53,7 +51,6 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
   largeFiles: [],
   files: [],
 
-  // Live streaming
   liveLargeFiles: [],
   liveFlaggedFiles: [],
   liveInsight: '',
@@ -65,8 +62,6 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
     } catch (err) {
       console.error('Failed to load settings', err)
     }
-
-    // Listen for progress
     window.fileZen.onScanProgress((payload) => {
       get().updateProgress(payload)
     })
@@ -75,7 +70,6 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
   startScan: async (paths: string[]) => {
     let { settings } = get()
     if (!settings) {
-      // Fallback if not initialized
       settings = {
         schemaVersion: 1,
         maxFileMb: 50,
@@ -105,6 +99,8 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       settings
     }
 
+    // startScan is void on IPC side, so we don't await a response,
+    // but the function is async to match the interface if needed, or just standard JS.
     window.fileZen.startScan(payload)
   },
 
@@ -119,13 +115,13 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
   updateProgress: (payload: ScanProgressPayload) => {
     const { sessionId, scanState, loadResults } = get()
 
-    // Auto-load results when finished
     if (
       payload.sessionId === sessionId &&
       payload.state === 'COMPLETED' &&
       scanState !== 'COMPLETED'
     ) {
-      setTimeout(() => loadResults(), 500)
+      // Small delay to ensure DB is written before reading
+      setTimeout(() => void loadResults(), 500)
     }
 
     set({
@@ -133,7 +129,6 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       filesScanned: payload.filesScanned,
       bytesScanned: payload.bytesScanned,
       currentFile: payload.currentFile,
-      // Live streaming data
       liveLargeFiles: payload.liveLargeFiles || [],
       liveFlaggedFiles: payload.liveFlaggedFiles || [],
       liveInsight: payload.liveInsight || ''
@@ -142,7 +137,6 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
 
   setIncludePath: (path: string) => {
     const { settings } = get()
-    // If settings are null, assume defaults/empty but preserve the new path
     const current = settings || {
       schemaVersion: 1,
       maxFileMb: 50,
@@ -155,7 +149,7 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
     }
     const newSettings = { ...current, includePaths: [path] }
     set({ settings: newSettings })
-    window.fileZen.saveSettings(newSettings)
+    void window.fileZen.saveSettings(newSettings)
   },
 
   updateSettings: async (update) => {
@@ -197,8 +191,6 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
 
     const { duplicates, largeFiles } = get()
     const newLarge = largeFiles.filter((f) => !fileIds.includes(f.id))
-
-    // Deep filter duplicates
     const newDups = duplicates
       .map((c) => ({
         ...c,

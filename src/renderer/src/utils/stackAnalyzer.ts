@@ -1,4 +1,4 @@
-import { FileNode, SmartStack, StackType } from '../../../shared/types'
+import { FileNode, SmartStack } from '../../../shared/types'
 
 export class StackAnalyzer {
   analyze(files: FileNode[]): SmartStack[] {

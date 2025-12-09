@@ -138,3 +138,15 @@ export interface FileZenApi {
   redactText(text: string): Promise<string>
   generateProjectDna(folderPath: string): Promise<string>
 }
+
+export type StackType = 'FILE_TYPE' | 'DATE' | 'PROJECT' | 'AI_CLUSTER'
+
+export interface SmartStack {
+  id: string
+  label: string
+  type: StackType
+  confidence: number
+  files: FileNode[]
+  reason: string
+  action: 'MOVE' | 'ARCHIVE' | 'DELETE'
+}

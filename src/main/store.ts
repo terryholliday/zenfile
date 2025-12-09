@@ -15,7 +15,7 @@ import { logger } from './logger'
 export class SettingsStore {
   private filePath: string
   private settings: SettingsSchema | null = null
-  
+
   // FIX: Write Lock
   private isSaving = false
   private pendingSave: SettingsSchema | null = null
@@ -67,34 +67,34 @@ export class SettingsStore {
 
     // Queue logic: If saving, mark pending.
     if (this.isSaving) {
-        this.pendingSave = newSettings
-        return
+      this.pendingSave = newSettings
+      return
     }
 
     this.isSaving = true
 
     try {
-        await this._writeToDisk(newSettings)
+      await this._writeToDisk(newSettings)
     } finally {
-        this.isSaving = false
-        // If a save came in while we were writing, process it now
-        if (this.pendingSave) {
-            const next = this.pendingSave
-            this.pendingSave = null
-            void this.save(next)
-        }
+      this.isSaving = false
+      // If a save came in while we were writing, process it now
+      if (this.pendingSave) {
+        const next = this.pendingSave
+        this.pendingSave = null
+        void this.save(next)
+      }
     }
   }
 
   private async _writeToDisk(data: SettingsSchema): Promise<void> {
     try {
-        // Atomic write via temp file (safer than direct overwrite)
-        const tempPath = `${this.filePath}.tmp`
-        await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8')
-        await fs.rename(tempPath, this.filePath)
-        logger.info('Settings saved')
+      // Atomic write via temp file (safer than direct overwrite)
+      const tempPath = `${this.filePath}.tmp`
+      await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8')
+      await fs.rename(tempPath, this.filePath)
+      logger.info('Settings saved')
     } catch (error: any) {
-        logger.error('Failed to save settings', { error: error.message })
+      logger.error('Failed to save settings', { error: error.message })
     }
   }
 

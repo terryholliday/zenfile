@@ -288,8 +288,8 @@ export function ScanDashboard(): JSX.Element {
                   <span className="block truncate px-4">
                     {settings?.includePaths[0]
                       ? settings.includePaths[0]
-                        .split(settings.includePaths[0].includes('\\') ? '\\' : '/')
-                        .pop()
+                          .split(settings.includePaths[0].includes('\\') ? '\\' : '/')
+                          .pop()
                       : 'Select Folder'}
                   </span>
                 </button>

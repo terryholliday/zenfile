@@ -15,93 +15,89 @@ import {
 import { FileNode, FileTag } from '../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
+// -----------------
+// Constants & Tag Rules
+// -----------------
+
+const TAG_RULES = [
+  { tag: 'IMAGE', patterns: [/\.(png|jpg|jpeg|gif|bmp|webp|svg)$/i] },
+  { tag: 'VIDEO', patterns: [/\.(mp4|mkv|mov|avi|wmv|flv|webm)$/i] },
+  { tag: 'AUDIO', patterns: [/\.(mp3|wav|flac|aac|ogg|m4a)$/i] },
+  { tag: 'DOCUMENT', patterns: [/\.(pdf|doc|docx|txt|rtf|odt|md)$/i] },
+  { tag: 'ARCHIVE', patterns: [/\.(zip|rar|7z|tar|gz|iso)$/i] },
+  {
+    tag: 'CODE',
+    patterns: [/\.(js|ts|tsx|jsx|css|html|json|py|java|c|cpp|h|cs|go|rs|php|rb|sql)$/i]
+  },
+  { tag: 'EXECUTABLE', patterns: [/\.(exe|msi|bat|sh|app|dmg|pkg)$/i] },
   { tag: 'SCREENSHOT', patterns: [/screen/i, /capture/i, /shot/i, /^img_\d{8}/i, /^screenshot/i] }
 ]
 
+const DEFAULT_IGNORES = new Set([
+  'node_modules',
+  '.git',
+  '.DS_Store',
+  'Thumbs.db',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.idea',
+  '.vscode',
+  'src',
+  'app',
+  'components',
+  'pages',
+  'public'
+])
+
+// -----------------
+// Helpers
+// -----------------
+
 function analyzeTags(fileName: string, text?: string): FileTag[] {
   const tags = new Set<string>()
-  // CAP INPUT LENGTH: Prevent regex ReDoS on massive minified files
-  const safeText = (text || '').substring(0, 5000) 
+  const safeText = (text || '').substring(0, 5000)
   const content = `${fileName} ${safeText}`.toLowerCase()
 
   for (const rule of TAG_RULES) {
     for (const pattern of rule.patterns) {
       if (pattern.test(content)) {
         tags.add(rule.tag as FileTag)
-        break // Match one pattern per tag is enough
+        break
       }
     }
   }
   return Array.from(tags) as FileTag[]
 }
 
-if (!parentPort) {
-  throw new Error('Worker must be spawned with parentPort')
-}
-
-// Global error handlers...
-// ... (omitted for brevity, assume existing) ...
-
-// Hardcoded defaults for safety, merged with incoming exclusions
-const DEFAULT_IGNORES = new Set([
-  'node_modules', '.git', '.DS_Store', 'Thumbs.db',
-  'dist', 'build', 'out', 'coverage', '.idea', '.vscode',
-  'src', 'app', 'components', 'pages', 'public' // Developer folders as requested
-])
-
 function shouldIgnore(name: string, exclusions: string[]): boolean {
   if (DEFAULT_IGNORES.has(name)) return true
-  if (name.startsWith('.')) return true 
+  if (name.startsWith('.')) return true
   if (exclusions.includes(name)) return true
   return false
 }
 
+// -----------------
+// Worker State
+// -----------------
+
 if (!parentPort) {
   throw new Error('Worker must be spawned with parentPort')
 }
 
-// Global error handlers to prevent silent crashes
-process.on('uncaughtException', (err) => {
-  const errorMsg = err instanceof Error ? err.message : String(err)
-  parentPort?.postMessage({
-    type: WorkerMessageType.RES_ERROR,
-    error: `Uncaught Exception: ${errorMsg}`,
-    fatal: true
-  } as WorkerResponse)
-  process.exit(1)
-})
-
-process.on('unhandledRejection', (reason) => {
-  parentPort?.postMessage({
-    type: WorkerMessageType.RES_ERROR,
-    error: `Unhandled Rejection: ${reason}`,
-    fatal: true
-  } as WorkerResponse)
-  process.exit(1)
-})
-
-// OCR Worker instance (lazy loaded)
 let ocrWorker: TesseractWorker | null = null
 
-// Hardcoded defaults for safety, merged with incoming exclusions
-const DEFAULT_IGNORES = new Set([
-  'node_modules', '.git', '.DS_Store', 'Thumbs.db',
-  'dist', 'build', 'out', 'coverage', '.idea', '.vscode',
-  'src', 'app', 'components', 'pages', 'public' // Developer folders as requested
-])
-
-function analyzeTags(fileName: string, text?: string): FileTag[] {
-  const tags = new Set<string>()
-  // CAP INPUT LENGTH: Prevent regex ReDoS on massive minified files
-  const safeText = (text || '').substring(0, 5000) 
-  const content = `${fileName} ${safeText}`.toLowerCase()
-
-  for (const rule of TAG_RULES) {
+async function getOcrWorker(): Promise<TesseractWorker> {
   if (!ocrWorker) {
     ocrWorker = await createWorker('eng')
   }
   return ocrWorker
 }
+
+// -----------------
+// Message Handling
+// -----------------
 
 parentPort.postMessage({ type: WorkerMessageType.RES_READY })
 
@@ -136,38 +132,9 @@ parentPort.on('message', async (command: WorkerCommand) => {
   }
 })
 
-async function handleOcrFile(id: string, filePath: string): Promise<void> {
-  try {
-    const worker = await getOcrWorker()
-
-    // Race between OCR and timeout
-    const ocrPromise = worker.recognize(filePath)
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('OCR timed out')), 60000)
-    )
-
-    const result = (await Promise.race([ocrPromise, timeoutPromise])) as { data: { text: string } }
-    const text = result.data.text
-
-    const response: OcrResultResponse = {
-      type: WorkerMessageType.RES_OCR_RESULT,
-      id,
-      filePath,
-      text: text.trim().substring(0, 1000) // Limit to 1KB for now
-    }
-    parentPort?.postMessage(response)
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err)
-    // OCR might fail on some images, just log error
-    const response: WorkerResponse = {
-      type: WorkerMessageType.RES_ERROR,
-      error: `OCR Failed: ${errorMsg}`,
-      path: filePath,
-      fatal: false
-    }
-    parentPort?.postMessage(response)
-  }
-}
+// -----------------
+// Handlers
+// -----------------
 
 async function handleScanDir(dirPath: string, exclusions: string[] = []): Promise<void> {
   try {
@@ -177,7 +144,6 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
     const dirs: string[] = []
 
     for (const entry of entries) {
-      // Filter IMMEDIATELY before stat() - reduces IPC by ~90% for code projects
       if (shouldIgnore(entry.name, exclusions)) continue
 
       const fullPath = path.join(dirPath, entry.name)
@@ -187,8 +153,6 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
       } else if (entry.isFile()) {
         try {
           const stats = await fs.stat(fullPath)
-          
-          // PERF FIX: Compute tags HERE in the worker
           const tags = analyzeTags(entry.name)
 
           const node: FileNode = {
@@ -199,14 +163,11 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
             atimeMs: stats.atimeMs,
             mtimeMs: stats.mtimeMs,
             isDirectory: false,
-            tags: tags // <--- Pre-calculated tags
+            tags: tags
           }
-
-          // node.tags = tagEngine.analyze(node)
-
           files.push(node)
         } catch {
-          // Ignore files we can't stat (race conditions etc)
+          // Ignore files we can't stat
         }
       }
     }
@@ -219,7 +180,6 @@ async function handleScanDir(dirPath: string, exclusions: string[] = []): Promis
     parentPort?.postMessage(response)
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err)
-    // EACCES or other IO errors on the directory itself
     const response: WorkerResponse = {
       type: WorkerMessageType.RES_ERROR,
       error: errorMsg,
@@ -235,7 +195,6 @@ async function handleHashFile(id: string, filePath: string): Promise<void> {
     const hash = crypto.createHash('sha256')
     const stream = createReadStream(filePath)
 
-    // Safety timeout
     const timeout = setTimeout(() => {
       stream.destroy()
       reject(new Error('Hashing timed out after 30s'))
@@ -264,3 +223,53 @@ async function handleHashFile(id: string, filePath: string): Promise<void> {
     })
   })
 }
+
+async function handleOcrFile(id: string, filePath: string): Promise<void> {
+  try {
+    const worker = await getOcrWorker()
+
+    const ocrPromise = worker.recognize(filePath)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('OCR timed out')), 60000)
+    )
+
+    const result = (await Promise.race([ocrPromise, timeoutPromise])) as { data: { text: string } }
+    const text = result.data.text
+
+    const response: OcrResultResponse = {
+      type: WorkerMessageType.RES_OCR_RESULT,
+      id,
+      filePath,
+      text: text.trim().substring(0, 1000)
+    }
+    parentPort?.postMessage(response)
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    const response: WorkerResponse = {
+      type: WorkerMessageType.RES_ERROR,
+      error: `OCR Failed: ${errorMsg}`,
+      path: filePath,
+      fatal: false
+    }
+    parentPort?.postMessage(response)
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  const errorMsg = err instanceof Error ? err.message : String(err)
+  parentPort?.postMessage({
+    type: WorkerMessageType.RES_ERROR,
+    error: `Uncaught Exception: ${errorMsg}`,
+    fatal: true
+  } as WorkerResponse)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (reason) => {
+  parentPort?.postMessage({
+    type: WorkerMessageType.RES_ERROR,
+    error: `Unhandled Rejection: ${reason}`,
+    fatal: true
+  } as WorkerResponse)
+  process.exit(1)
+})

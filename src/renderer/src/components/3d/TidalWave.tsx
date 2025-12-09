@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { extend } from '@react-three/fiber'
@@ -69,7 +69,7 @@ export function TidalWave({
 }: { isActive?: boolean; speed?: number } & JSX.IntrinsicElements['mesh']) {
   const materialRef = useRef<any>()
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     if (materialRef.current) {
       // Only animate time if active
       if (isActive) {

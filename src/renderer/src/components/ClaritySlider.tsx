@@ -20,8 +20,7 @@ export function ClaritySlider() {
     root.style.setProperty('--zen-spacing', `${spacing}rem`)
 
     // Blur: High blur in Zen (for background), Low blur in God
-    const blur = 10 - clarity * 10
-    // root.style.setProperty('--zen-blur', `${blur}px`)
+    // root.style.setProperty('--zen-blur', `${10 - clarity * 10}px`)
   }, [clarity])
 
   return (

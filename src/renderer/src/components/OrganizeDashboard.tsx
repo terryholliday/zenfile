@@ -149,7 +149,7 @@ export function OrganizeDashboard() {
               <StackCard
                 key={stack.id}
                 stack={stack}
-                onExecute={executeStack}
+                onExecute={(id, opts) => executeStack(id, undefined, opts)}
                 onDismiss={dismissStack}
               />
             ))}

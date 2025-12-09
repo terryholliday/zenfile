@@ -1,5 +1,3 @@
-import { FileNode } from '../shared/types'
-
 export class PrivacyService {
   private static instance: PrivacyService
 
@@ -43,8 +41,8 @@ export class PrivacyService {
 
     redacted = redacted.replace(this.patterns.email, (match) => char.repeat(match.length))
     redacted = redacted.replace(this.patterns.phone, (match) => char.repeat(match.length))
-    redacted = redacted.replace(this.patterns.ssn, (match) => 'XXX-XX-XXXX') // Standard SSN redaction
-    redacted = redacted.replace(this.patterns.creditCard, (match) => '****-****-****-****')
+    redacted = redacted.replace(this.patterns.ssn, () => 'XXX-XX-XXXX') // Standard SSN redaction
+    redacted = redacted.replace(this.patterns.creditCard, () => '****-****-****-****')
 
     return redacted
   }

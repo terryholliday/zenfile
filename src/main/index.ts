@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { logger } from './logger'
 import { settingsStore } from './store'
 import { scanService } from './scan-service'
+import { aiService } from './ai-service'
 import { IpcChannel, SettingsSchema } from '../shared/types'
 
 function createWindow(): void {
@@ -109,12 +110,12 @@ app.whenReady().then(() => {
 // LIFECYCLE FIX: Clean up workers on quit
 app.on('before-quit', async () => {
   logger.info('App stopping, cleaning up services...')
-  
+
   // 1. Stop the active scan immediately
   scanService.cancel()
-  
+
   // 2. Save the Vector DB if needed
-  await aiService.saveDb().catch(err => console.error(err))
+  await aiService.saveDb().catch((err) => console.error(err))
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

@@ -1,4 +1,4 @@
-import { create, insert, remove, search as oramaSearch, load, save, type Orama } from '@orama/orama'
+import { create, insert, remove, search, load, save, type Orama } from '@orama/orama'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs/promises'
@@ -9,140 +9,138 @@ import type { AiWorkerCommand, AiWorkerResponse } from './ai.worker'
 
 export class AiService {
   private static instance: AiService
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private db: Orama<any> | null = null
   private worker: Worker | null = null
-
-  // Fix 1: Initialization Promise for concurrent access safety (race condition fix)
   private initPromise: Promise<void> | null = null
-
   private pendingRequests = new Map<
     string,
-    { resolve: (val: any) => void; reject: (err: any) => void; timer: NodeJS.Timeout }
+    { resolve: (val: any) => void; reject: (err: any) => void }
   >()
-
-  // Cache for deduplication service reuse - prevents redundant computation
   private embeddingCache = new Map<string, number[]>()
+  private clusterRequest: { resolve: (val: any) => void; reject: (err: any) => void } | null = null
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   private constructor() {}
 
   static getInstance(): AiService {
-    if (!AiService.instance) {
-      AiService.instance = new AiService()
-    }
+    if (!AiService.instance) AiService.instance = new AiService()
     return AiService.instance
   }
 
-  // ... (Initialization remains same) ...
+  // FIX: Expose cache clearing
+  clearCache(): void {
+    this.embeddingCache.clear()
+    logger.info('AI Embedding cache cleared')
+  }
 
-  // --- Worker Communication ---
+  async initialize(): Promise<void> {
+    if (this.worker && this.db) return
+    if (this.initPromise) return this.initPromise
 
-  private postToWorker(cmd: AiWorkerCommand): void {
+    this.initPromise = this._initializeInternal().finally(() => {
+      this.initPromise = null
+    })
+    return this.initPromise
+  }
+
+  private async _initializeInternal(): Promise<void> {
+    try {
+      logger.info('Initializing AI Service & Worker...')
+
+      const isDev = !app.isPackaged
+      const resourcePath = process.resourcesPath || ''
+      const workerPath = isDev
+        ? path.join(__dirname, 'ai.worker.js')
+        : path.join(resourcePath, 'app.asar.unpacked', 'out', 'main', 'ai.worker.js')
+
+      this.worker = new Worker(workerPath)
+
+      this.worker.on('exit', (code) => {
+        if (code !== 0) {
+          logger.error(`AI Worker crashed with code ${code}. Restarting...`)
+          this.worker = null
+          this.initPromise = null
+        }
+      })
+
+      this.worker.on('message', (msg: AiWorkerResponse) => this.handleWorkerMessage(msg))
+      this.postToWorker({ type: 'INIT' })
+
+      const dbPath = path.join(app.getPath('userData'), 'zenfile-vectors.json')
+      try {
+        const data = await fs.readFile(dbPath, 'utf-8')
+        this.db = await create({
+          schema: { id: 'string', path: 'string', content: 'string', embedding: 'vector[384]' }
+        })
+        await load(this.db, JSON.parse(data))
+      } catch {
+        this.db = await create({
+          schema: { id: 'string', path: 'string', content: 'string', embedding: 'vector[384]' }
+        })
+      }
+    } catch (err: any) {
+      logger.error('Failed to initialize AI Service', err)
+      throw err
+    }
+  }
+
+  private postToWorker(cmd: AiWorkerCommand) {
     if (!this.worker) throw new Error('AI Worker not initialized')
     this.worker.postMessage(cmd)
   }
 
   private handleWorkerMessage(msg: AiWorkerResponse) {
-    if (msg.type === 'EMBED_RES' || msg.type === 'ERROR') {
-      // @ts-ignore - msg.id exists on these types
-      const id = msg.id
-      if (id && this.pendingRequests.has(id)) {
-        const req = this.pendingRequests.get(id)!
-        clearTimeout(req.timer) // Clear timeout
-        
-        if (msg.type === 'ERROR') req.reject(new Error(msg.error))
-        else req.resolve((msg as any).embedding)
-        
-        this.pendingRequests.delete(id)
-      }
-    } else if (msg.type === 'SUMMARIZE_RES') {
-         // Fix 2: Crash Recovery - restart worker if it crashes
-      this.worker?.on('exit', (code) => { // Added '?' for safety, as worker might be null if already crashed
-        if (code !== 0) {
-          logger.error(`AI Worker crashed with code ${code}. Restarting...`)
-          
-          // CRITICAL FIX: Reject all pending promises so UI doesn't hang
-          for (const [id, req] of this.pendingRequests) {
-              req.reject(new Error(`AI Worker crashed while processing ${id}`))
-          }
-          this.pendingRequests.clear()
-
-          this.worker = null
-          this.initPromise = null // Allow re-initialization
+    switch (msg.type) {
+      case 'EMBED_RES': {
+        const req = this.pendingRequests.get(msg.id)
+        if (req) {
+          req.resolve(msg.embedding)
+          this.pendingRequests.delete(msg.id)
         }
-      })  
-         // Existing summary handling if needed
-         this.pendingRequests.forEach((req, key) => {
-            if (key.startsWith('sum_')) {
-                clearTimeout(req.timer)
-                req.resolve(msg.summary)
-                this.pendingRequests.delete(key)
-            }
-         })
+        break
+      }
+      case 'SUMMARIZE_RES': {
+        const req = this.pendingRequests.get(msg.id)
+        if (req) {
+          req.resolve(msg.summary)
+          this.pendingRequests.delete(msg.id)
+        }
+        break
+      }
+      case 'CLUSTER_RES': {
+        if (this.clusterRequest) {
+          this.clusterRequest.resolve(msg.clusters)
+          this.clusterRequest = null
+        }
+        break
+      }
+      case 'ERROR': {
+        if (msg.id) {
+          const req = this.pendingRequests.get(msg.id)
+          if (req) {
+            req.reject(new Error(msg.error))
+            this.pendingRequests.delete(msg.id)
+          }
+        } else if (this.clusterRequest) {
+          this.clusterRequest.reject(new Error(msg.error))
+          this.clusterRequest = null
+        }
+        break
+      }
     }
   }
-
-  // --- Public API ---
 
   async generateEmbedding(text: string, fileId?: string): Promise<number[]> {
     if (!this.worker) await this.initialize()
     if (fileId && this.embeddingCache.has(fileId)) return this.embeddingCache.get(fileId)!
 
     const reqId = fileId || `req_${Date.now()}_${Math.random()}`
-    
     return new Promise<number[]>((resolve, reject) => {
-      // TIMEOUT PROTECTION
-      const timer = setTimeout(() => {
-        if (this.pendingRequests.has(reqId)) {
-          this.pendingRequests.delete(reqId)
-          reject(new Error('AI Request Timed Out'))
-        }
-      }, 30000) // 30s timeout
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.pendingRequests.set(reqId, { resolve, reject, timer } as any)
+      this.pendingRequests.set(reqId, { resolve, reject })
       this.postToWorker({ type: 'EMBED', id: reqId, text })
-    }).then(vec => {
-        if (fileId) this.embeddingCache.set(fileId, vec)
-        return vec
+    }).then((vec) => {
+      if (fileId) this.embeddingCache.set(fileId, vec)
+      return vec
     })
-  }
-
-  clearCache(): void {
-    this.embeddingCache.clear()
-  }
-
-  // RESTORED: Needed by DnaService
-  async generateSummary(text: string): Promise<string> {
-    if (!this.worker) await this.initialize()
-    const reqId = `sum_${Date.now()}`
-    return new Promise<string>((resolve, reject) => {
-        // Simple singleton summary queue logic or mapped ID
-        this.pendingRequests.set(reqId, { resolve, reject } as any)
-        // Worker needs to be updated to accept ID for summary or we treat FIFO
-        // Assuming we update worker types to include ID for summary command
-        this.postToWorker({ type: 'SUMMARIZE', text } as any) 
-    })
-  }
-
-  // RESTORED: Needed by IPC Search
-  async search(query: string): Promise<{ id: string; path: string; score: number }[]> {
-    if (!this.db) await this.initialize()
-    const queryEmbedding = await this.generateEmbedding(query)
-    
-    const results = await oramaSearch(this.db!, {
-      mode: 'vector',
-      vector: { value: queryEmbedding, property: 'embedding' },
-      similarity: 0.7,
-      limit: 10
-    })
-
-    return results.hits.map((hit) => ({
-      id: String(hit.document.id),
-      path: String(hit.document.path),
-      score: hit.score
-    }))
   }
 
   async indexFile(file: FileNode): Promise<void> {
@@ -152,14 +150,16 @@ export class AiService {
 
     try {
       const embedding = await this.generateEmbedding(textToEmbed, file.id)
-      try { await remove(this.db!, file.id) } catch {} // Upsert
+      try {
+        await remove(this.db!, file.id)
+      } catch {}
       await insert(this.db!, {
         id: file.id,
         path: file.path,
         content: textToEmbed.substring(0, 500),
         embedding: embedding
       })
-    } catch (err) {
+    } catch (err: any) {
       logger.error(`Failed to index file ${file.name}`, err)
     }
   }
@@ -169,6 +169,44 @@ export class AiService {
     const dbPath = path.join(app.getPath('userData'), 'zenfile-vectors.json')
     const data = await save(this.db)
     await fs.writeFile(dbPath, JSON.stringify(data))
+  }
+
+  async computeClusters(
+    items: { id: string; vec: number[] }[],
+    threshold = 0.95
+  ): Promise<string[][]> {
+    if (!this.worker) await this.initialize()
+    return new Promise<string[][]>((resolve, reject) => {
+      if (this.clusterRequest) {
+        reject(new Error('Clustering in progress'))
+        return
+      }
+      this.clusterRequest = { resolve, reject }
+      this.postToWorker({ type: 'CLUSTER', items, threshold })
+    })
+  }
+
+  async generateSummary(text: string): Promise<string> {
+    if (!this.worker) await this.initialize()
+    const reqId = `sum_${Date.now()}_${Math.random()}`
+    return new Promise<string>((resolve, reject) => {
+      this.pendingRequests.set(reqId, { resolve, reject })
+      this.postToWorker({ type: 'SUMMARIZE', id: reqId, text })
+    })
+  }
+
+  async search(query: string, limit = 10): Promise<any[]> {
+    if (!this.db) await this.initialize()
+    try {
+      const result = await search(this.db!, {
+        term: query,
+        limit
+      })
+      return result.hits.map((h) => h.document)
+    } catch (err) {
+      logger.error('Search failed', err)
+      return []
+    }
   }
 }
 
