@@ -16,6 +16,8 @@ export enum WorkerMessageType {
 export interface ScanDirCommand {
   type: WorkerMessageType.CMD_SCAN_DIR
   path: string
+  // Pass exclusions to worker to prevent IPC flood
+  exclusions: string[]
 }
 
 export interface HashFileCommand {

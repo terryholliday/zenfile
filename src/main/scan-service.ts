@@ -143,8 +143,6 @@ export class ScanService {
   private currentSettings: ScanSettings | null = null
   private lastScannedFile = ''
 
-
-
   // -----------------
   // Public API
   // -----------------
@@ -334,7 +332,9 @@ export class ScanService {
       if (dir) {
         this.dispatchToWorker(i, {
           type: WorkerMessageType.CMD_SCAN_DIR,
-          path: dir
+          path: dir,
+          // Pass exclusions to worker for atomic IPC filtering
+          exclusions: this.currentSettings?.excludePaths || []
         })
         continue
       }
