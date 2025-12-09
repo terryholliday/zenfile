@@ -1,4 +1,4 @@
-import { create, insert, search, load, save, type Orama } from '@orama/orama'
+import { create, insert, remove, search, load, save, type Orama } from '@orama/orama'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs/promises'
@@ -12,11 +12,14 @@ export class AiService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private db: Orama<any> | null = null
   private worker: Worker | null = null
+
+  // Fix 1: Initialization Promise for concurrent access safety (race condition fix)
+  private initPromise: Promise<void> | null = null
+
   private pendingRequests = new Map<
     string,
     { resolve: (val: number[]) => void; reject: (err: Error) => void }
   >()
-  private isInitializing = false
 
   // Cache for deduplication service reuse - prevents redundant computation
   private embeddingCache = new Map<string, number[]>()
@@ -31,14 +34,24 @@ export class AiService {
     return AiService.instance
   }
 
+  // --- Robust Initialization (Race Condition Safe) ---
   async initialize(): Promise<void> {
     if (this.worker && this.db) return
-    if (this.isInitializing) return
 
-    this.isInitializing = true
-    logger.info('Initializing AI Service & Worker...')
+    // If already initializing, return the existing promise to prevent race conditions
+    if (this.initPromise) return this.initPromise
 
+    this.initPromise = this._initializeInternal().finally(() => {
+      this.initPromise = null
+    })
+
+    return this.initPromise
+  }
+
+  private async _initializeInternal(): Promise<void> {
     try {
+      logger.info('Initializing AI Service & Worker...')
+
       // 1. Spawn AI Worker (keeps heavy ML off main thread)
       let workerPath = path.join(__dirname, 'ai.worker.js')
       if (app.isPackaged) {
@@ -52,6 +65,16 @@ export class AiService {
       }
 
       this.worker = new Worker(workerPath)
+
+      // Fix 2: Crash Recovery - restart worker if it crashes
+      this.worker.on('exit', (code) => {
+        if (code !== 0) {
+          logger.error(`AI Worker crashed with code ${code}. Restarting...`)
+          this.worker = null
+          this.initPromise = null // Allow re-initialization
+        }
+      })
+
       this.worker.on('message', (msg: AiWorkerResponse) => this.handleWorkerMessage(msg))
       this.worker.on('error', (err) => logger.error('AI Worker Error', err))
 
@@ -91,8 +114,7 @@ export class AiService {
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       logger.error('Failed to initialize AI Service', { error: errorMsg })
-    } finally {
-      this.isInitializing = false
+      throw err
     }
   }
 
@@ -119,7 +141,7 @@ export class AiService {
       }
 
       case 'SUMMARIZE_RES':
-        // For now, summarization is sync - can extend with request tracking
+        // Summarization handled separately if needed
         break
 
       case 'ERROR': {
@@ -168,6 +190,14 @@ export class AiService {
 
     try {
       const embedding = await this.generateEmbedding(textToEmbed, file.id)
+
+      // Fix 3: Idempotency (Upsert) - remove existing entry before inserting
+      // Prevents duplicate vectors when rescanning folders
+      try {
+        await remove(this.db!, file.id)
+      } catch {
+        // Ignore if not found - this is expected for new files
+      }
 
       await insert(this.db!, {
         id: file.id,

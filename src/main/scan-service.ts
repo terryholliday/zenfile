@@ -494,6 +494,14 @@ export class ScanService {
         await aiService.indexFile(file).catch((err: unknown) => {
           logger.error('AI index failed', err)
         })
+
+        // FIX: MEMORY LEAK PREVENTION
+        // Once indexed, we don't need the heavy OCR text in main process memory.
+        // The Vector DB now owns the semantic representation.
+        // We keep tags and basic metadata, but dump the raw 'text' string.
+        if (file.metadata?.text) {
+          delete file.metadata.text
+        }
       }
     } finally {
       this.isProcessingAi = false
