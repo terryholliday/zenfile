@@ -1,4 +1,4 @@
-import { useRef, useMemo, useLayoutEffect, useState } from 'react'
+import { useRef, useMemo, useLayoutEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -15,8 +15,8 @@ export function WarpField({ isScanning }: WarpFieldProps) {
     const { camera } = useThree()
     const currentSpeed = useRef(10) // Start faster
 
-    // Use useState lazy initializer for random data generation (runs once, pure)
-    const [stars] = useState(() => {
+    // Use useMemo for stable mutable data (ignore purity warning for random init)
+    const stars = useMemo(() => {
         const temp: { x: number; y: number; z: number; scale: number; speedMultiplier: number }[] = []
         for (let i = 0; i < 6000; i++) { // Increased count
             // Wider area
@@ -28,7 +28,7 @@ export function WarpField({ isScanning }: WarpFieldProps) {
             temp.push({ x, y, z, scale, speedMultiplier })
         }
         return temp
-    })
+    }, [])
 
     const dummy = useMemo(() => new THREE.Object3D(), [])
 
@@ -53,6 +53,7 @@ export function WarpField({ isScanning }: WarpFieldProps) {
 
         // 2. Smooth acceleration
         // Idle speed 20 (cruising), Warp speed 150 (very fast)
+        const targetSpeed = isScanning ? 150 : 20
         // Lerp current speed towards target
         // Use a lower factor (0.5) for gradual acceleration "rev up" feel
         currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 0.5)
