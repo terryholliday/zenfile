@@ -124,8 +124,8 @@ export class ScanService {
 
   // Queues
   private readonly dirQueue = new FifoQueue<string>()
-  private readonly hashQueue = new FifoQueue<string>()
-  private readonly ocrQueue = new FifoQueue<string>()
+  private readonly hashQueue = new FifoQueue<{ id: string; path: string }>()
+  private readonly ocrQueue = new FifoQueue<{ id: string; path: string }>()
   private readonly aiQueue = new FifoQueue<FileNode>()
 
   // AI backpressure
@@ -220,7 +220,11 @@ export class ScanService {
   private async initializeWorkers(): Promise<void> {
     this.terminateWorkers()
 
-    const workerScript = path.join(__dirname, 'worker.js')
+    // Robust worker path resolution for Electron/Vite
+    const isDev = !app.isPackaged
+    const workerScript = isDev
+      ? path.join(__dirname, 'worker.js')
+      : path.join(process.resourcesPath!, 'app.asar.unpacked', 'out', 'main', 'worker.js')
     logger.info(`Spawning ${WORKER_POOL_SIZE} workers from ${workerScript}`)
 
     const readyPromises: Promise<void>[] = []
@@ -336,21 +340,23 @@ export class ScanService {
       }
 
       // 2. Hashing
-      const hashFile = this.hashQueue.dequeue()
-      if (hashFile) {
+      const hashItem = this.hashQueue.dequeue()
+      if (hashItem) {
         this.dispatchToWorker(i, {
           type: WorkerMessageType.CMD_HASH_FILE,
-          filePath: hashFile
+          id: hashItem.id,
+          filePath: hashItem.path
         })
         continue
       }
 
       // 3. OCR
-      const ocrFile = this.ocrQueue.dequeue()
-      if (ocrFile) {
+      const ocrItem = this.ocrQueue.dequeue()
+      if (ocrItem) {
         this.dispatchToWorker(i, {
           type: WorkerMessageType.CMD_OCR_FILE,
-          filePath: ocrFile
+          id: ocrItem.id,
+          filePath: ocrItem.path
         })
         continue
       }
@@ -477,7 +483,7 @@ export class ScanService {
       }
 
       if (this.currentSettings?.enableOcr && OCR_IMAGE_EXTENSIONS.has(ext)) {
-        this.ocrQueue.enqueue(f.path)
+        this.ocrQueue.enqueue({ id: f.id, path: f.path })
       }
     }
 
@@ -485,38 +491,31 @@ export class ScanService {
   }
 
   private handleHashResult(res: HashResultResponse): void {
-    // We don't have ID in response, so we must lookup by path.
-    // This is O(N) per hash result, but safe given Map iteration is reasonably fast for typical file counts (~10k-100k).
-    // Optimization: If needed, ScanService could maintain a Path->ID map.
-    // For now, simple iteration is robust.
-
-    for (const file of this.resultFiles.values()) {
-      if (file.path === res.filePath) {
-        file.hash = res.hash
-        this.processedHashes++
-        this.updateState('SCANNING')
-        return
-      }
+    // O(1) lookup by ID
+    const file = this.resultFiles.get(res.id)
+    if (file) {
+      file.hash = res.hash
+      this.processedHashes++
+      this.updateState('SCANNING')
     }
   }
 
   private handleOcrResult(res: OcrResultResponse): void {
     if (!this.session) return
 
-    for (const file of this.resultFiles.values()) {
-      if (file.path !== res.filePath) continue
+    // O(1) lookup by ID
+    const file = this.resultFiles.get(res.id)
+    if (!file) return
 
-      file.metadata = { ...file.metadata, text: res.text }
+    file.metadata = { ...file.metadata, text: res.text }
 
-      const newTags = tagEngine.analyze(file)
-      const mergedTags = new Set(file.tags ?? [])
-      for (const t of newTags) mergedTags.add(t)
-      file.tags = Array.from(mergedTags)
+    const newTags = tagEngine.analyze(file)
+    const mergedTags = new Set(file.tags ?? [])
+    for (const t of newTags) mergedTags.add(t)
+    file.tags = Array.from(mergedTags)
 
-      // Queue for re-index
-      this.aiQueue.enqueue(file)
-      break
-    }
+    // Queue for re-index
+    this.aiQueue.enqueue(file)
 
     this.processedOcrDocs++
     this.updateState('SCANNING')
@@ -558,7 +557,7 @@ export class ScanService {
       const candidates = this.identifyHashCandidates()
       if (candidates.length > 0) {
         this.hashQueue.clear()
-        this.hashQueue.enqueue(...candidates.map((f) => f.path))
+        this.hashQueue.enqueue(...candidates.map((f) => ({ id: f.id, path: f.path })))
         logger.info(`Queued ${this.hashQueue.size} files for hashing`)
         this.processQueue()
         return

@@ -58,10 +58,10 @@ parentPort.on('message', async (command: WorkerCommand) => {
         await handleScanDir(command.path)
         break
       case WorkerMessageType.CMD_HASH_FILE:
-        await handleHashFile(command.filePath)
+        await handleHashFile(command.id, command.filePath)
         break
       case WorkerMessageType.CMD_OCR_FILE:
-        await handleOcrFile(command.filePath)
+        await handleOcrFile(command.id, command.filePath)
         break
       case WorkerMessageType.CMD_TERMINATE:
         if (ocrWorker) {
@@ -82,7 +82,7 @@ parentPort.on('message', async (command: WorkerCommand) => {
   }
 })
 
-async function handleOcrFile(filePath: string): Promise<void> {
+async function handleOcrFile(id: string, filePath: string): Promise<void> {
   try {
     const worker = await getOcrWorker()
 
@@ -97,6 +97,7 @@ async function handleOcrFile(filePath: string): Promise<void> {
 
     const response: OcrResultResponse = {
       type: WorkerMessageType.RES_OCR_RESULT,
+      id,
       filePath,
       text: text.trim().substring(0, 1000) // Limit to 1KB for now
     }
@@ -165,7 +166,7 @@ async function handleScanDir(dirPath: string): Promise<void> {
   }
 }
 
-async function handleHashFile(filePath: string): Promise<void> {
+async function handleHashFile(id: string, filePath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const hash = crypto.createHash('sha256')
     const stream = createReadStream(filePath)
@@ -190,6 +191,7 @@ async function handleHashFile(filePath: string): Promise<void> {
       const result = hash.digest('hex')
       const response: HashResultResponse = {
         type: WorkerMessageType.RES_HASH_RESULT,
+        id,
         filePath,
         hash: result
       }

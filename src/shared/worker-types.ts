@@ -20,6 +20,7 @@ export interface ScanDirCommand {
 
 export interface HashFileCommand {
   type: WorkerMessageType.CMD_HASH_FILE
+  id: string
   filePath: string
 }
 
@@ -29,6 +30,7 @@ export interface TerminateCommand {
 
 export interface OcrFileCommand {
   type: WorkerMessageType.CMD_OCR_FILE
+  id: string
   filePath: string
 }
 
@@ -42,12 +44,14 @@ export interface ScanResultResponse {
 
 export interface HashResultResponse {
   type: WorkerMessageType.RES_HASH_RESULT
+  id: string
   filePath: string
   hash: string
 }
 
 export interface OcrResultResponse {
   type: WorkerMessageType.RES_OCR_RESULT
+  id: string
   filePath: string
   text: string
 }

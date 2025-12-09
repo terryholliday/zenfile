@@ -3,6 +3,13 @@ import { aiService } from './ai-service'
 import { logger } from './logger'
 import { promises as fs } from 'fs'
 
+// Only these extensions can be safely read as UTF-8 text
+const PLAINTEXT_EXTENSIONS = new Set([
+  'txt', 'md', 'markdown', 'json', 'ts', 'tsx', 'js', 'jsx',
+  'py', 'java', 'c', 'cpp', 'h', 'cs', 'go', 'rs', 'php', 'rb',
+  'html', 'css', 'scss', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg'
+])
+
 export class DeduplicationService {
   private static instance: DeduplicationService
 
@@ -30,11 +37,14 @@ export class DeduplicationService {
   async findSemanticDuplicates(files: FileNode[]): Promise<DuplicateCluster[]> {
     logger.info(`Starting Semantic Deduplication on ${files.length} files`)
 
-    // 1. Filter candidates (text files, meaningful size, not too huge)
+    // 1. Filter candidates: only files with extractable text content
     const candidates = files.filter((f) => {
-      const ext = f.name.split('.').pop()?.toLowerCase()
+      const ext = f.name.split('.').pop()?.toLowerCase() || ''
+      // Must be plaintext OR have OCR-extracted text in metadata
+      const isPlaintext = PLAINTEXT_EXTENSIONS.has(ext)
+      const hasOcrText = !!f.metadata?.text
       return (
-        ['txt', 'md', 'json', 'ts', 'js', 'py', 'doc', 'docx', 'pdf'].includes(ext || '') &&
+        (isPlaintext || hasOcrText) &&
         f.sizeBytes > 50 &&
         f.sizeBytes < 1024 * 1024
       ) // Limit to 1MB for now for speed
@@ -47,12 +57,22 @@ export class DeduplicationService {
     // 2. Generate embeddings
     for (const file of candidates) {
       try {
-        // If we already indexed it, we might be able to fetch from DB?
-        // For now, let's regenerate to be safe/simple, or fetch if exposed.
-        // Actually AiService doesn't expose "getEmbeddingForFile", only search.
-        // We'll regenerate. It's local and fast for small batch.
+        let content: string | null = null
+        const ext = file.name.split('.').pop()?.toLowerCase() || ''
 
-        const content = await fs.readFile(file.path, 'utf-8')
+        if (PLAINTEXT_EXTENSIONS.has(ext)) {
+          // Safe to read as UTF-8
+          content = await fs.readFile(file.path, 'utf-8')
+        } else if (file.metadata?.text) {
+          // Use OCR-extracted text for binary files (PDFs, images, etc.)
+          content = file.metadata.text
+        }
+
+        if (!content) {
+          logger.warn(`No text content available for ${file.name}, skipping`)
+          continue
+        }
+
         // Truncate for embedding model limit
         const snippet = content.substring(0, 1000)
 
