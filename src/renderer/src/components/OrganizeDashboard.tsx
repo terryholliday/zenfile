@@ -1,15 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOrganizeStore } from '../store/useOrganizeStore'
 import { useScanStore } from '../store/useScanStore'
-import { clsx } from 'clsx'
 import { SmartStack } from '../../../shared/types'
 
 function StackCard({ stack, onExecute, onDismiss }: {
     stack: SmartStack,
-    onExecute: (id: string) => void,
+    onExecute: (id: string, options?: { generateDna?: boolean }) => void,
     onDismiss: (id: string) => void
 }) {
+    // Default to true for Project stacks
+    const [generateDna, setGenerateDna] = useState(stack.type === 'PROJECT')
+
     return (
         <motion.div
             layout
@@ -44,66 +46,99 @@ function StackCard({ stack, onExecute, onDismiss }: {
                 )}
             </div>
 
-            <div className="flex gap-2 mt-auto pt-2">
-                <button
-                    onClick={() => onDismiss(stack.id)}
-                    className="flex-1 py-2 rounded-lg text-xs font-bold text-neutral-400 hover:bg-white/5 transition-colors"
-                >
-                    Ignore
-                </button>
-                <button
-                    onClick={() => onExecute(stack.id)}
-                    className="flex-[2] py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
-                >
-                    Make Folder
-                </button>
+            <div className="mt-auto">
+                <label className="flex items-center gap-2 mb-3 cursor-pointer group/chk">
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${generateDna ? 'bg-indigo-500 border-indigo-500' : 'border-neutral-600 bg-black/40 group-hover/chk:border-neutral-500'}`}>
+                        {generateDna && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                    <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={generateDna}
+                        onChange={e => setGenerateDna(e.target.checked)}
+                    />
+                    <span className={`text-xs font-medium transition-colors ${generateDna ? 'text-indigo-300' : 'text-neutral-500'}`}>
+                        Generate Project DNA 🧬
+                    </span>
+                </label>
+
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => onDismiss(stack.id)}
+                        className="flex-1 py-2 rounded-lg text-xs font-bold text-neutral-400 hover:bg-white/5 transition-colors"
+                    >
+                        Ignore
+                    </button>
+                    <button
+                        onClick={() => onExecute(stack.id, { generateDna })}
+                        className="flex-[2] py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                    >
+                        Make Folder
+                    </button>
+                </div>
             </div>
-            export function OrganizeDashboard() {
-    const {stacks, isAnalyzing, analyze, executeStack, dismissStack} = useOrganizeStore()
-            const {files} = useScanStore(state => ({
-                files: state.files
+        </motion.div>
+    )
+}
+
+export function OrganizeDashboard() {
+    const { stacks, isAnalyzing, analyze, executeStack, dismissStack } = useOrganizeStore()
+    const { files } = useScanStore(state => ({
+        files: state.files
     }))
 
     // Auto-analyze when opened if data exists
     useEffect(() => {
         if (stacks.length === 0 && files.length > 0) {
-                analyze(files)
-            }
+            analyze(files)
+        }
     }, [files])
 
-            return (
-            <div className="h-full p-6 overflow-hidden flex flex-col">
-                <header className="mb-6">
+    return (
+        <div className="h-full p-6 overflow-hidden flex flex-col">
+            <header className="mb-6 flex justify-between items-end">
+                <div>
                     <h2 className="text-3xl font-black text-white tracking-tight mb-2">Smart Stacks</h2>
                     <p className="text-neutral-400 max-w-xl">
                         AI-powered organization recommendations. Group loose files into logical folders with one click.
                     </p>
-                </header>
-
-                {isAnalyzing ? (
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-                        <div className="text-sm text-indigo-300 font-bold tracking-widest uppercase">Analyzing Context...</div>
-                    </div>
-                ) : stacks.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-10 scrollbar-hide">
-                        <AnimatePresence>
-                            {stacks.map(stack => (
-                                <StackCard
-                                    key={stack.id}
-                                    stack={stack}
-                                    onExecute={executeStack}
-                                    onDismiss={dismissStack}
-                                />
-                            ))}
-                        </AnimatePresence>
-                    </div>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-neutral-500">
-                        <div className="text-6xl mb-4 opacity-20">📂</div>
-                        <p>No stacks found. Try scanning a messier folder!</p>
-                    </div>
+                </div>
+                {/* Undo Button */}
+                {/* @ts-ignore - history access */}
+                {useOrganizeStore(s => s.history && s.history.length > 0) && (
+                    <button
+                        onClick={() => useOrganizeStore.getState().undo()}
+                        className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                    >
+                        <span>↩</span> Undo Last
+                    </button>
                 )}
-            </div>
-            )
+            </header>
+
+            {isAnalyzing ? (
+                <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
+                    <div className="text-sm text-indigo-300 font-bold tracking-widest uppercase">Analyzing Context...</div>
+                </div>
+            ) : stacks.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-10 scrollbar-hide">
+                    <AnimatePresence>
+                        {stacks.map(stack => (
+                            <StackCard
+                                key={stack.id}
+                                stack={stack}
+                                onExecute={executeStack}
+                                onDismiss={dismissStack}
+                            />
+                        ))}
+                    </AnimatePresence>
+                </div>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-neutral-500">
+                    <div className="text-6xl mb-4 opacity-20">📂</div>
+                    <p>No stacks found. Try scanning a messier folder!</p>
+                </div>
+            )}
+        </div>
+    )
 }

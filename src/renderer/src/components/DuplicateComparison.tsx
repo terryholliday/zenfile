@@ -46,8 +46,17 @@ export function DuplicateComparison({ cluster, onKeep, onClose }: DuplicateCompa
                 {/* Header */}
                 <div className="p-6 glass-header border-b border-white/5 flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-white">Smart Compare</h2>
-                        <p className="text-sm text-neutral-400 font-mono mt-1">{cluster.files[0].name}</p>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-white">Smart Compare</h2>
+                            {cluster.type === 'SEMANTIC' && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase tracking-widest">
+                                    Semantic Match
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-sm text-neutral-400 font-mono mt-1">
+                            {cluster.type === 'SEMANTIC' ? 'Content Similarity Detected' : cluster.files[0].name}
+                        </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">✕</button>
                 </div>
@@ -60,8 +69,8 @@ export function DuplicateComparison({ cluster, onKeep, onClose }: DuplicateCompa
                             return (
                                 <div key={file.id} className={`w-80 flex flex-col rounded-xl border-2 transition-all relative ${isRecommended ? 'border-indigo-500 bg-indigo-500/5 shadow-lg shadow-indigo-500/10' : 'border-neutral-800 bg-neutral-800/20'}`}>
                                     {isRecommended && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
-                                            Zen AI Recommendation
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg whitespace-nowrap">
+                                            {cluster.type === 'SEMANTIC' ? 'Best Version' : 'Zen AI Recommendation'}
                                         </div>
                                     )}
 

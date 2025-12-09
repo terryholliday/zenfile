@@ -11,7 +11,8 @@ export enum IpcChannel {
   GetSuggestions = 'IPC_GET_SUGGESTIONS',
   ActionMove = 'IPC_ACTION_MOVE',
   AiSearch = 'IPC_AI_SEARCH',
-  RedactText = 'IPC_REDACT_TEXT'
+  RedactText = 'IPC_REDACT_TEXT',
+  GenerateProjectDna = 'IPC_GENERATE_PROJECT_DNA'
 }
 
 export type ScannerState = 'IDLE' | 'SCANNING' | 'PAUSED' | 'CANCELLING' | 'COMPLETED' | 'CANCELLED'
@@ -36,6 +37,7 @@ export interface FileNode {
 export interface DuplicateCluster {
   hash: string
   files: FileNode[]
+  type?: 'EXACT' | 'SEMANTIC'
 }
 
 export interface Anchor {
@@ -121,6 +123,7 @@ export interface FileZenApi {
   ): Promise<{ success: string[]; failures: string[] }>
   aiSearch(query: string): Promise<any[]>
   redactText(text: string): Promise<string>
+  generateProjectDna(folderPath: string): Promise<string> // Returns the generated summary
 }
 
 // --- AI / Smart Stack Types ---

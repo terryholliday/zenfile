@@ -231,12 +231,26 @@ export class ScanService {
 
     for (const [hash, list] of hashMap) {
       if (list.length > 1) {
-        clusters.push({ hash, files: list })
+        clusters.push({ hash, files: list, type: 'EXACT' })
       }
     }
     this.session.duplicates = clusters
     this.session.files = Array.from(this.resultFiles.values()) // Populate all files
-    logger.info(`Analysis Finished. Identified ${clusters.length} duplicate clusters.`)
+
+    // Semantic Deduplication Trigger
+    // We do this after exact match, as it's more expensive
+    try {
+        const { deduplicationService } = await import('./deduplication-service')
+        const semanticClusters = await deduplicationService.findSemanticDuplicates(this.session.files)
+        if (semanticClusters.length > 0) {
+            this.session.duplicates.push(...semanticClusters)
+            logger.info(`Added ${semanticClusters.length} semantic clusters to results`)
+        }
+    } catch (err) {
+        logger.error('Semantic deduplication failed', err)
+    }
+
+    logger.info(`Analysis Finished. Identified ${this.session.duplicates.length} total duplicate clusters.`)
   }
 
   // --- Actions ---

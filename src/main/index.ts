@@ -91,6 +91,11 @@ app.whenReady().then(() => {
       const { privacyService } = await import('./privacy-service')
       return privacyService.redact(text)
   })
+  
+  ipcMain.handle(IpcChannel.GenerateProjectDna, async (_, folderPath) => {
+      const { dnaService } = await import('./dna-service')
+      return dnaService.generateProjectDna(folderPath)
+  })
 
   createWindow()
 
