@@ -28,7 +28,8 @@ export class SettingsStore {
       includePaths: DEFAULT_INCLUDE_PATHS,
       excludePaths: DEFAULT_EXCLUDE_PATHS,
       dryRun: true,
-      isDarkTheme: true
+      isDarkTheme: true,
+      enableOcr: false
     }
   }
 

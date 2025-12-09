@@ -48,14 +48,6 @@ export const useOrganizeStore = create<OrganizeStoreState>((set, get) => ({
     // Better: let the UI pass it in. If generic "Organize", we might default to:
     // [ParentFolder]/[StackLabel]
     
-    // Use the directory of the first file as the base
-    const baseDir = customDestination || window.fileZen ? 
-        (stack.files[0]?.path.split(/[\\/]/).slice(0, -1).join(window.fileZen.sep || '\\') + '\\' + stack.label) 
-        : '';
-        
-    // Wait, I don't have 'sep' exposed. I'll rely on the main process OR simple string manipulation.
-    // Since windows is the target, '\\' is safe.
-    
     // Implementation:
     // 1. Determine optimized destination (e.g. creating a folder named "Screenshots")
     // 2. Call API
@@ -63,11 +55,10 @@ export const useOrganizeStore = create<OrganizeStoreState>((set, get) => ({
     // Fallback if no destination provided
     let finalDest = customDestination
     if (!finalDest) {
-         // Create folder alongside the first file
-         const firstFile = stack.files[0]
-         // Simple dirname
-         const parent = firstFile.path.substring(0, firstFile.path.lastIndexOf('\\'))
-         finalDest = `${parent}\\${stack.label}`
+      const firstFile = stack.files[0]
+      const separator = firstFile?.path.includes('\\') ? '\\' : '/'
+      const parent = firstFile?.path.split(/[\\/]/).slice(0, -1).join(separator)
+      finalDest = parent ? `${parent}${separator}${stack.label}` : stack.label
     }
 
     try {

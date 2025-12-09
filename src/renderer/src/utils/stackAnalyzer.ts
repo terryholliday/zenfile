@@ -1,4 +1,4 @@
-import { FileNode, SmartStack, StackType } from '../../../shared/types'
+import { FileNode, SmartStack } from '../../../shared/types'
 import { v4 as uuidv4 } from 'uuid'
 
 // --- Helpers ---
