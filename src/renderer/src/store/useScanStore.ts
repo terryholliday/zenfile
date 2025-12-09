@@ -20,6 +20,11 @@ interface ScanStoreState {
   largeFiles: FileNode[]
   files: FileNode[]
 
+  // Live streaming during scan
+  liveLargeFiles: FileNode[]
+  liveFlaggedFiles: FileNode[]
+  liveInsight: string
+
   // Settings Cache
   settings: SettingsSchema | null
 
@@ -48,6 +53,11 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
   largeFiles: [],
   files: [],
 
+  // Live streaming
+  liveLargeFiles: [],
+  liveFlaggedFiles: [],
+  liveInsight: '',
+
   initialize: async () => {
     try {
       const settings = await window.fileZen.getSettings()
@@ -73,7 +83,8 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
         includePaths: paths,
         excludePaths: [],
         dryRun: true,
-        isDarkTheme: true
+        isDarkTheme: true,
+        enableOcr: false
       }
       set({ settings })
     }
@@ -121,7 +132,11 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       scanState: payload.state,
       filesScanned: payload.filesScanned,
       bytesScanned: payload.bytesScanned,
-      currentFile: payload.currentFile
+      currentFile: payload.currentFile,
+      // Live streaming data
+      liveLargeFiles: payload.liveLargeFiles || [],
+      liveFlaggedFiles: payload.liveFlaggedFiles || [],
+      liveInsight: payload.liveInsight || ''
     })
   },
 
@@ -135,7 +150,8 @@ export const useScanStore = create<ScanStoreState>((set, get) => ({
       includePaths: [],
       excludePaths: [],
       dryRun: true,
-      isDarkTheme: true
+      isDarkTheme: true,
+      enableOcr: false
     }
     const newSettings = { ...current, includePaths: [path] }
     set({ settings: newSettings })

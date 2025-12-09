@@ -1,9 +1,7 @@
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useScanStore } from '../store/useScanStore'
 import clsx from 'clsx'
-import { Canvas } from '@react-three/fiber'
-import { Stars, Sparkles, Float } from '@react-three/drei'
 
 const ZEN_QUOTES = [
   'Order is the sanity of the mind, the health of the body, the peace of the city.',
@@ -20,18 +18,20 @@ import { ZenGalaxy } from './ZenGalaxy'
 
 // ... existing imports ...
 
-export function ScanDashboard() {
+export function ScanDashboard(): JSX.Element {
   const {
     scanState,
     filesScanned,
     bytesScanned,
     currentFile,
-    duplicates,
-    largeFiles,
     startScan,
     cancelScan,
     settings,
-    setIncludePath
+    setIncludePath,
+    // Live streaming data
+    liveLargeFiles,
+    liveFlaggedFiles,
+    liveInsight
   } = useScanStore()
 
   const [quote, setQuote] = useState(ZEN_QUOTES[0])
@@ -47,7 +47,7 @@ export function ScanDashboard() {
     return () => clearInterval(interval)
   }, [isScanning])
 
-  function formatBytes(bytes: number) {
+  function formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -178,7 +178,7 @@ export function ScanDashboard() {
                 exit={{ opacity: 0, y: -10 }}
                 className="text-lg text-indigo-100/80 font-light italic text-center max-w-xl"
               >
-                "{quote}"
+                &ldquo;{quote}&rdquo;
               </motion.p>
             )}
           </AnimatePresence>
@@ -187,14 +187,77 @@ export function ScanDashboard() {
         {/* Action Bar */}
         <div className="w-full max-w-lg space-y-4">
           {isScanning && (
-            <div className="w-full p-4 rounded-xl bg-black/40 border border-white/5 backdrop-blur-md overflow-hidden relative">
-              <div className="absolute top-0 left-0 h-0.5 bg-indigo-500 animate-pulse w-full opacity-50" />
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                <span className="text-xs font-mono text-indigo-200 truncate flex-1 opacity-70">
-                  {currentFile || 'Initializing...'}
-                </span>
+            <div className="w-full space-y-3">
+              {/* AI Insight Banner */}
+              {liveInsight && (
+                <div className="w-full p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md">
+                  <p className="text-sm text-indigo-200 font-medium">{liveInsight}</p>
+                </div>
+              )}
+
+              {/* Current File - FULL PATH */}
+              <div className="w-full p-4 rounded-xl bg-black/40 border border-white/5 backdrop-blur-md overflow-hidden relative">
+                <div className="absolute top-0 left-0 h-0.5 bg-indigo-500 animate-pulse w-full opacity-50" />
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping mt-1.5 flex-shrink-0" />
+                  <span className="text-[10px] font-mono text-indigo-200 break-all opacity-70 leading-relaxed">
+                    {currentFile || 'Initializing...'}
+                  </span>
+                </div>
               </div>
+
+              {/* Live Findings Panel */}
+              {(liveLargeFiles.length > 0 || liveFlaggedFiles.length > 0) && (
+                <div className="w-full p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md space-y-3">
+                  <h3 className="text-xs font-bold text-white/70 uppercase tracking-wider">
+                    Live Findings
+                  </h3>
+
+                  {/* Large Files */}
+                  {liveLargeFiles.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-amber-300 font-medium">
+                        📦 Large Files ({liveLargeFiles.length})
+                      </p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {liveLargeFiles.slice(0, 3).map((f) => (
+                          <div
+                            key={f.id}
+                            className="flex justify-between text-[10px] text-white/60"
+                          >
+                            <span className="truncate flex-1 mr-2">{f.name}</span>
+                            <span className="text-amber-300/70 flex-shrink-0">
+                              {formatBytes(f.sizeBytes)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Flagged Files */}
+                  {liveFlaggedFiles.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-emerald-300 font-medium">
+                        🏷️ Tagged Files ({liveFlaggedFiles.length})
+                      </p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {liveFlaggedFiles.slice(-3).map((f) => (
+                          <div
+                            key={f.id}
+                            className="flex justify-between text-[10px] text-white/60"
+                          >
+                            <span className="truncate flex-1 mr-2">{f.name}</span>
+                            <span className="text-emerald-300/70 flex-shrink-0">
+                              {f.tags?.join(', ')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

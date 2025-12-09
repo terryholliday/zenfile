@@ -142,6 +142,9 @@ export class ScanService {
   private readonly resultFiles: Map<string, FileNode> = new Map()
   private currentSettings: ScanSettings | null = null
   private lastScannedFile = ''
+  
+  // Live streaming data for UI
+  private recentFlaggedFiles: FileNode[] = []
 
   // -----------------
   // Public API
@@ -285,18 +288,85 @@ export class ScanService {
 
     this.lastUpdate = now
 
+    // Get top 10 largest files for live streaming
+    const liveLargeFiles = [...this.session.largeFiles]
+      .sort((a, b) => b.sizeBytes - a.sizeBytes)
+      .slice(0, 10)
+
+    // Get last 5 flagged files
+    const liveFlaggedFiles = this.recentFlaggedFiles.slice(-5)
+
+    // Generate live AI insight
+    const liveInsight = this.generateLiveInsight()
+
     const payload: ScanProgressPayload = {
       sessionId: this.session.id,
       state: this.session.state,
       filesScanned: this.processedFiles,
       bytesScanned: this.processedBytes,
       currentFile: this.lastScannedFile,
-      progress: 0 // TODO: add real progress when you have a total
+      progress: 0, // TODO: add real progress when you have a total
+      liveLargeFiles,
+      liveFlaggedFiles,
+      liveInsight
     }
 
     BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send(IpcChannel.ScanProgress, payload)
     })
+  }
+
+  private generateLiveInsight(): string {
+    if (!this.session) return ''
+
+    const largeCount = this.session.largeFiles.length
+    const flaggedCount = this.recentFlaggedFiles.length
+
+    // Count tags
+    const tagCounts: Record<string, number> = {}
+    for (const f of this.recentFlaggedFiles) {
+      for (const tag of f.tags || []) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+      }
+    }
+
+    // Build insight message
+    const insights: string[] = []
+
+    if (largeCount > 0) {
+      const totalSize = this.session.largeFiles.reduce((sum, f) => sum + f.sizeBytes, 0)
+      insights.push(`📦 Found ${largeCount} large file${largeCount > 1 ? 's' : ''} (${this.formatBytes(totalSize)} total)`)
+    }
+
+    if (tagCounts['INVOICE']) {
+      insights.push(`📄 Detected ${tagCounts['INVOICE']} invoice/receipt file${tagCounts['INVOICE'] > 1 ? 's' : ''}`)
+    }
+    if (tagCounts['SCREENSHOT']) {
+      insights.push(`📸 Found ${tagCounts['SCREENSHOT']} screenshot${tagCounts['SCREENSHOT'] > 1 ? 's' : ''}`)
+    }
+    if (tagCounts['FINANCIAL']) {
+      insights.push(`💰 Found ${tagCounts['FINANCIAL']} financial document${tagCounts['FINANCIAL'] > 1 ? 's' : ''}`)
+    }
+    if (tagCounts['PERSONAL']) {
+      insights.push(`👤 Detected ${tagCounts['PERSONAL']} personal document${tagCounts['PERSONAL'] > 1 ? 's' : ''}`)
+    }
+    if (tagCounts['CONTRACT']) {
+      insights.push(`📝 Found ${tagCounts['CONTRACT']} contract/agreement${tagCounts['CONTRACT'] > 1 ? 's' : ''}`)
+    }
+
+    if (insights.length === 0 && this.processedFiles > 100) {
+      insights.push(`🔍 Scanning... ${this.processedFiles.toLocaleString()} files analyzed`)
+    }
+
+    return insights.join(' • ') || '🔍 Analyzing files...'
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
 
   // -----------------
@@ -475,6 +545,15 @@ export class ScanService {
       }
 
       f.tags = tagEngine.analyze(f)
+
+      // Track flagged files for live streaming to UI
+      if (f.tags.length > 0) {
+        this.recentFlaggedFiles.push(f)
+        // Keep only last 50 to prevent memory bloat
+        if (this.recentFlaggedFiles.length > 50) {
+          this.recentFlaggedFiles = this.recentFlaggedFiles.slice(-50)
+        }
+      }
 
       const ext = path.extname(f.name).toLowerCase()
 

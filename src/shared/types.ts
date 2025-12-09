@@ -112,6 +112,10 @@ export interface ScanProgressPayload {
   bytesScanned: number
   currentFile?: string
   progress: number
+  // Live streaming results
+  liveLargeFiles?: FileNode[]    // Rolling top 10 large files
+  liveFlaggedFiles?: FileNode[]  // Recently tagged files (last 5)
+  liveInsight?: string           // AI insight string
 }
 
 export interface ActionPayload {
