@@ -3,7 +3,7 @@ import fs from 'fs/promises'
 import { createReadStream } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
-import { createWorker } from 'tesseract.js'
+import { createWorker, Worker as TesseractWorker } from 'tesseract.js'
 import {
   WorkerMessageType,
   type WorkerCommand,
@@ -20,9 +20,9 @@ if (!parentPort) {
 }
 
 // OCR Worker instance (lazy loaded)
-let ocrWorker: any = null
+let ocrWorker: TesseractWorker | null = null
 
-async function getOcrWorker() {
+async function getOcrWorker(): Promise<TesseractWorker> {
   if (!ocrWorker) {
     ocrWorker = await createWorker('eng')
   }
@@ -50,10 +50,11 @@ parentPort.on('message', async (command: WorkerCommand) => {
         process.exit(0)
         break
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
     const errorResponse: WorkerResponse = {
       type: WorkerMessageType.RES_ERROR,
-      error: err.message || 'Unknown worker error',
+      error: errorMsg || 'Unknown worker error',
       path: (command as any).path || (command as any).filePath,
       fatal: false
     }
@@ -64,9 +65,15 @@ parentPort.on('message', async (command: WorkerCommand) => {
 async function handleOcrFile(filePath: string) {
   try {
     const worker = await getOcrWorker()
-    const {
-      data: { text }
-    } = await worker.recognize(filePath)
+
+    // Race between OCR and timeout
+    const ocrPromise = worker.recognize(filePath)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('OCR timed out')), 60000)
+    )
+
+    const result = (await Promise.race([ocrPromise, timeoutPromise])) as any
+    const text = result.data.text
 
     const response: OcrResultResponse = {
       type: WorkerMessageType.RES_OCR_RESULT,
@@ -74,11 +81,12 @@ async function handleOcrFile(filePath: string) {
       text: text.trim().substring(0, 1000) // Limit to 1KB for now
     }
     parentPort?.postMessage(response)
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
     // OCR might fail on some images, just log error
     const response: WorkerResponse = {
       type: WorkerMessageType.RES_ERROR,
-      error: `OCR Failed: ${err.message}`,
+      error: `OCR Failed: ${errorMsg}`,
       path: filePath,
       fatal: false
     }
@@ -124,11 +132,12 @@ async function handleScanDir(dirPath: string) {
       dirs
     }
     parentPort?.postMessage(response)
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = (err as any).code || (err as any).message || String(err)
     // EACCES or other IO errors on the directory itself
     const response: WorkerResponse = {
       type: WorkerMessageType.RES_ERROR,
-      error: err.code || err.message,
+      error: errorMsg,
       path: dirPath,
       fatal: false
     }
@@ -136,12 +145,19 @@ async function handleScanDir(dirPath: string) {
   }
 }
 
-async function handleHashFile(filePath: string) {
+async function handleHashFile(filePath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const hash = crypto.createHash('sha256')
     const stream = createReadStream(filePath)
 
+    // Safety timeout
+    const timeout = setTimeout(() => {
+      stream.destroy()
+      reject(new Error('Hashing timed out after 30s'))
+    }, 30000)
+
     stream.on('error', (err) => {
+      clearTimeout(timeout)
       reject(err)
     })
 
@@ -150,6 +166,7 @@ async function handleHashFile(filePath: string) {
     })
 
     stream.on('end', () => {
+      clearTimeout(timeout)
       const result = hash.digest('hex')
       const response: HashResultResponse = {
         type: WorkerMessageType.RES_HASH_RESULT,

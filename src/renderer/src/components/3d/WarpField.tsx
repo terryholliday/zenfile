@@ -54,11 +54,11 @@ export function WarpField({ isScanning }: WarpFieldProps): JSX.Element {
     // Store particle data
     const particlesRef = useRef<
         {
-            vec: THREE.Vector3;
-            initialRadius: number;
-            speedMultiplier: number;
-            scale: number;
-            phase: number;
+            vec: THREE.Vector3
+            initialRadius: number
+            speedMultiplier: number
+            scale: number
+            phase: number
         }[]
     >([])
 
@@ -68,7 +68,7 @@ export function WarpField({ isScanning }: WarpFieldProps): JSX.Element {
         particlesRef.current = generateParticles()
     }, [])
 
-    useFrame((state, delta) => {
+    useFrame((_state, delta) => {
         if (!meshRef.current) return
 
         // "Zen" time flows slowly, but accelerates slightly during scanning
