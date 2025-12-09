@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unknown-property */
 import { useRef, useMemo, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Html, Float, Sparkles } from '@react-three/drei'

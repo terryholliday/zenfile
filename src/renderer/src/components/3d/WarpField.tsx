@@ -1,4 +1,5 @@
-import { useRef, useMemo, useLayoutEffect } from 'react'
+/* eslint-disable react/no-unknown-property */
+import { useRef, useMemo, useLayoutEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -6,78 +7,101 @@ interface WarpFieldProps {
     isScanning: boolean
 }
 
-const AREA_WIDTH = 60
-const AREA_HEIGHT = 60
-const DEPTH = 100
+const STAR_COUNT = 6000
+
+// Helper to generate stars (spherical distribution for radial warp)
+const generateStars = () => {
+    const temp: { vec: THREE.Vector3; initialDistance: number; speedMultiplier: number; scale: number }[] = []
+    for (let i = 0; i < STAR_COUNT; i++) {
+        // Random point in sphere
+        const vec = new THREE.Vector3(
+            (Math.random() - 0.5),
+            (Math.random() - 0.5),
+            (Math.random() - 0.5)
+        ).normalize()
+
+        // Spread them out at different initial distances so they don't all start at center
+        const initialDistance = Math.random() * 60 + 10 // Start between 10 and 70 units out
+        const speedMultiplier = Math.random() * 0.5 + 0.5
+        const scale = Math.random() * 0.5 + 0.2
+        temp.push({ vec, initialDistance, speedMultiplier, scale })
+    }
+    return temp
+}
 
 export function WarpField({ isScanning }: WarpFieldProps) {
     const meshRef = useRef<THREE.InstancedMesh>(null)
-    const { camera } = useThree()
-    const currentSpeed = useRef(10) // Start faster
+    const currentSpeed = useRef(2) // Radial speed
 
-    // Use useMemo for stable mutable data (ignore purity warning for random init)
-    const stars = useMemo(() => {
-        const temp: { x: number; y: number; z: number; scale: number; speedMultiplier: number }[] = []
-        for (let i = 0; i < 6000; i++) { // Increased count
-            // Wider area
-            const x = (Math.random() - 0.5) * AREA_WIDTH * 3
-            const y = (Math.random() - 0.5) * AREA_HEIGHT * 3
-            const z = (Math.random() - 0.5) * DEPTH * 2
-            const scale = Math.random() * 0.5 + 0.1 // Varied sizes
-            const speedMultiplier = Math.random() * 0.8 + 0.2
-            temp.push({ x, y, z, scale, speedMultiplier })
-        }
-        return temp
+    // Store stars in a ref so we can mutate them without React State issues
+    const starsRef = useRef<{ vec: THREE.Vector3; currentDistance: number; speedMultiplier: number; scale: number }[]>([])
+    const [ready, setReady] = useState(false)
+
+    // Generate stars once on mount
+    useLayoutEffect(() => {
+        const data = generateStars()
+        // Initialize current distance
+        starsRef.current = data.map((d) => ({
+            ...d,
+            currentDistance: d.initialDistance
+        }))
+        setReady(true)
     }, [])
 
     const dummy = useMemo(() => new THREE.Object3D(), [])
 
+    // Initial placement (only after stars are ready)
     useLayoutEffect(() => {
-        if (!meshRef.current) return
+        if (!meshRef.current || !ready) return
 
-        // Initial placement setup
-        stars.forEach((data, i) => {
-            dummy.position.set(data.x, data.y, data.z)
+        starsRef.current.forEach((data, i) => {
+            dummy.position.copy(data.vec).multiplyScalar(data.currentDistance)
             dummy.scale.set(data.scale, data.scale, data.scale)
             dummy.updateMatrix()
             meshRef.current!.setMatrixAt(i, dummy.matrix)
         })
         meshRef.current.instanceMatrix.needsUpdate = true
-    }, [dummy, stars])
+    }, [dummy, ready])
 
     useFrame((state, delta) => {
-        if (!meshRef.current) return
+        if (!meshRef.current || !ready) return
 
-        // 1. Orient to camera
-        meshRef.current.lookAt(camera.position)
+        // Note: No meshRef.current.lookAt(camera)
+        // We want the explosion to be world-space centered
 
         // 2. Smooth acceleration
-        // Idle speed 20 (cruising), Warp speed 150 (very fast)
-        const targetSpeed = isScanning ? 150 : 20
-        // Lerp current speed towards target
-        // Use a lower factor (0.5) for gradual acceleration "rev up" feel
-        currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 0.5)
+        // Idle speed: slow expansion. Warp speed: fast expansion.
+        const targetSpeed = isScanning ? 40 : 2
+        currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, targetSpeed, delta * 0.8)
 
         // Animate
+        const stars = starsRef.current
         for (let i = 0; i < stars.length; i++) {
             const star = stars[i]
 
-            // Move towards camera (local +Z)
-            star.z += (currentSpeed.current * star.speedMultiplier) * delta
+            // Radial movement: increase distance
+            star.currentDistance += currentSpeed.current * star.speedMultiplier * delta
 
-            // Loop
-            if (star.z > DEPTH) {
-                star.z = -DEPTH
-                star.x = (Math.random() - 0.5) * AREA_WIDTH * 3
-                star.y = (Math.random() - 0.5) * AREA_HEIGHT * 3
+            // Loop: if too far, reset to near center
+            if (star.currentDistance > 100) {
+                star.currentDistance = Math.random() * 20 + 5 // Reset close to center
             }
 
-            dummy.position.set(star.x, star.y, star.z)
+            // Position = vec * distance
+            dummy.position.copy(star.vec).multiplyScalar(star.currentDistance)
 
-            // Stretch based on speed
-            // Min stretch 1, max stretch 20
-            const stretch = Math.max(1, Math.min(currentSpeed.current * 0.15, 20))
-            dummy.scale.set(star.scale, star.scale, star.scale * stretch)
+            // Orientation: Point OUTWARDS from center to create streaks
+            // lookAt target: position + vec (points away from center)
+            const lookTarget = dummy.position.clone().add(star.vec)
+            dummy.lookAt(lookTarget)
+
+            // Stretch logic
+            // Straighter lines for Star Trek look
+            // Idle: 1.0 (dot). scanning: stretch up to 50x (very long streaks)
+            const stretch = Math.max(1, Math.min(currentSpeed.current * 0.8, 50))
+
+            // Make them thinner (0.2) to look like lines, stretching only on Z
+            dummy.scale.set(star.scale * 0.2, star.scale * 0.2, star.scale * stretch)
 
             dummy.updateMatrix()
             meshRef.current.setMatrixAt(i, dummy.matrix)
@@ -86,12 +110,12 @@ export function WarpField({ isScanning }: WarpFieldProps) {
     })
 
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, stars.length]}>
-            {/* Smaller base geometry for "star" look instead of blobs */}
-            <sphereGeometry args={[0.05, 8, 8]} />
+        <instancedMesh ref={meshRef} args={[undefined, undefined, STAR_COUNT]}>
+            {/* Cylinder looks better for streaks? Or highly scaled sphere. Sphere is fine. */}
+            <sphereGeometry args={[0.08, 8, 8]} />
             <meshBasicMaterial
-                color="#ffffff"
-                transparent={false}
+                color="#e0f2fe" // Light cyan (Star Trek warp signature)
+                transparent={false} // Performance
                 opacity={1.0}
                 blending={THREE.AdditiveBlending}
                 toneMapped={false}
