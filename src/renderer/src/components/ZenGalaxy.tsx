@@ -19,7 +19,7 @@ function FilePlanet({
   position: [number, number, number]
   color: string
   onClick?: (file: FileNode) => void
-}) {
+}): JSX.Element {
   const meshRef = useRef<THREE.Mesh>(null)
   const [hovered, setHover] = useState(false)
 
@@ -85,7 +85,7 @@ function DuplicateSun({
   cluster: DuplicateCluster
   position: [number, number, number]
   onClick?: (cluster: DuplicateCluster) => void
-}) {
+}): JSX.Element {
   const groupRef = useRef<THREE.Group>(null)
   const [hovered, setHover] = useState(false)
 
@@ -169,7 +169,7 @@ interface ZenGalaxyProps {
   onClusterSelect?: (cluster: DuplicateCluster) => void
 }
 
-export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
+export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps): JSX.Element {
   const { largeFiles, duplicates, scanState } = useScanStore()
   const [ready, setReady] = useState(false)
 
@@ -267,11 +267,17 @@ export function ZenGalaxy({ onClusterSelect }: ZenGalaxyProps) {
   )
 }
 
-function Supernova({ file, position }: { file: FileNode; position: [number, number, number] }) {
+function Supernova({
+  file,
+  position
+}: {
+  file: FileNode
+  position: [number, number, number]
+}): JSX.Element {
   const meshRef = useRef<THREE.Mesh>(null)
   const [hovered, setHover] = useState(false)
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (meshRef.current) {
       meshRef.current.rotation.z += delta * 0.2
       meshRef.current.rotation.y += delta * 0.5
