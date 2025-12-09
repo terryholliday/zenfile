@@ -226,10 +226,18 @@ export function ScanDashboard() {
           <div className="w-full">
             {isIdle ? (
               <button
-                onClick={() => startScan(settings?.includePaths || [])}
+                onClick={async () => {
+                  const hasPath = settings?.includePaths && settings.includePaths.length > 0
+                  if (hasPath) {
+                    startScan(settings.includePaths)
+                  } else {
+                    const path = await window.fileZen.openDirectory()
+                    if (path) setIncludePath(path)
+                  }
+                }}
                 className="w-full py-4 bg-white text-black hover:bg-indigo-50 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
               >
-                Start Zen Scan
+                {settings?.includePaths && settings.includePaths.length > 0 ? 'Start Zen Scan' : 'Select Directory to Scan'}
               </button>
             ) : (
               <button

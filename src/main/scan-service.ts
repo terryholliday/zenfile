@@ -69,6 +69,12 @@ export class ScanService {
     this.processQueue()
   }
 
+  cancel() {
+    logger.info('Cancelling scan session')
+    this.terminateWorkers()
+    this.updateState('CANCELLED', true)
+  }
+
   // ...
 
   private processQueue() {
