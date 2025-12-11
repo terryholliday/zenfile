@@ -32,3 +32,7 @@ $ npm run build:mac
 # For Linux
 $ npm run build:linux
 ```
+
+## Project DNA Prompt
+
+Use `docs/project-dna-system-prompt.md` for the "Project DNA" Wiki/README generator system prompt.
