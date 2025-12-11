@@ -7,6 +7,7 @@ import { SettingsDashboard } from './components/SettingsDashboard'
 import { ChatDashboard } from './components/ChatDashboard'
 import { ClaritySlider } from './components/ClaritySlider'
 import { useScanStore } from './store/useScanStore'
+import { AIConcierge } from './components/AIConcierge'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'results' | 'organize' | 'chat' | 'settings'>(
@@ -99,6 +100,8 @@ function App() {
             </div>
           )}
         </div>
+
+        <AIConcierge />
       </main>
 
       {/* Status Bar */}
