@@ -1,0 +1,36 @@
+{
+  "application": "ZenFile",
+  "version": "2.0-Concept",
+  "theme": {
+    "primary_mode": "Zen",
+    "visual_style": "Bioluminescent Flow"
+  },
+  "feature_manifest": [
+    {
+      "category": "Core_Infrastructure",
+      "features": [
+        { "key": "core_ocr", "name": "Deep Scan OCR", "priority": "critical" },
+        { "key": "core_sync", "name": "Omni-Sync Architecture", "priority": "high" }
+      ]
+    },
+    {
+      "category": "AI_Logic_Engine",
+      "features": [
+        { "key": "wow_zen_sort", "name": "Zen Sort (One-Click Declutter)", "priority": "P0_WOW" },
+        { "key": "wow_semantic_search", "name": "Conversation Search Engine", "priority": "P0_WOW" },
+        { "key": "wow_project_dna", "name": "Project DNA Generator", "priority": "P1_WOW" },
+        { "key": "wow_privacy_redactor", "name": "Privacy Redactor Bot", "priority": "P1_WOW" },
+        { "key": "wow_smart_purge", "name": "Smart Purge (Rot Detection)", "priority": "P2_WOW" }
+      ]
+    },
+    {
+      "category": "UI_Experience",
+      "features": [
+        { "key": "ui_nebula", "name": "Nebula Visualization", "priority": "P0_WOW" },
+        { "key": "ui_breathing_scanner", "name": "Breathing Zen Scanner", "priority": "P1_WOW" },
+        { "key": "ui_context_totems", "name": "Context Totems (Drop Zones)", "priority": "P2_WOW" },
+        { "key": "ui_shapeshifter", "name": "Shapeshifter Previews", "priority": "P1_WOW" }
+      ]
+    }
+  ]
+}
